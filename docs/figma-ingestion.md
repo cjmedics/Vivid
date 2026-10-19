@@ -140,10 +140,19 @@ npm run create -- --figma 'https://www.figma.com/design/FILE_KEY/Design?node-id=
 `npm run create:layered-sample -- --render` exercises a purpose-built SVG fixture.
 It is not a pixel-matched version of the older PNG fixture. The live workflow also
 renders `reconstructed-frame.png` using the `VividLayerReference` composition for
-comparison with the original export. Final productions are retained in an encrypted
-GitHub artifact for delivery; they are no longer deleted by the validation script.
-The artifact expires after 90 days, so the delivered MP4 and production archive are
-saved separately for longer-term access. Existing completed renders are never overwritten.
+comparison with the original export. At the owner's request, the MP4 is saved
+without video encryption as `vivid-layer-motion.mp4` in an unpublished draft release.
+Download that MP4 directly; no certificate, private key, or decryption secret is
+needed to watch a new render. The workflow never publishes the release, keeping the
+video restricted to repository writers rather than exposing it in public-repository
+workflow artifacts.
+
+The separate full-source backup remains encrypted because it includes Figma nodes,
+SVGs and production metadata beyond the approved MP4 preview. Its encryption does
+not block the direct MP4 delivery step, which runs first. The validation script does
+not delete source files or overwrite previous productions. Legacy encrypted archives
+are preserved unchanged and still require their original key. Backup workflow
+artifacts expire after 90 days; draft-release MP4s remain until explicitly removed.
 
 This first layer milestone is deterministic scene reconstruction, not text reflow,
 word/character animation inside outlined text, interaction inference, or AI art direction.
