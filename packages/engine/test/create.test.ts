@@ -11,6 +11,61 @@ const common = ["--brand", "fixtures/design.brand.json", "--brief", "fixtures/de
 const figma = ["--figma", "https://www.figma.com/design/VividFixture/Launchboard?node-id=1-2", "--figma-json", "fixtures/design.nodes.json", "--capture", "fixtures/design.capture.png"];
 
 describe("create command", () => {
+  it("reopens a saved production without credentials, import files, or network access", () => {
+    const temp = mkdtempSync(join(tmpdir(), "vivid-project-"));
+    try {
+      const original = join(temp, "original");
+      execFileSync(process.execPath, [...cli, ...common, ...figma, "--layers", "--figma-svg", "fixtures/design.layers.svg", "--out", original], { cwd: root });
+      const sourcePath = join(original, "product-ir.json");
+      const before = readFileSync(sourcePath, "utf8");
+      const denyNetwork = join(temp, "deny-network.mjs");
+      writeFileSync(denyNetwork, 'globalThis.fetch = () => { throw new Error("Unexpected network access"); };');
+      const pacing = join(temp, "pacing.json");
+      writeFileSync(pacing, JSON.stringify({ introSec: 2, overviewSec: 3, focusSec: 2, outroSec: 2 }));
+      const out = join(temp, "reopened");
+      execFileSync(process.execPath, ["--import", denyNetwork, ...cli, "--project", original, "--pacing", pacing, "--out", out], {
+        cwd: root, env: { ...process.env, FIGMA_ACCESS_TOKEN: "", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "" },
+      });
+      const ir = JSON.parse(readFileSync(join(out, "product-ir.json"), "utf8"));
+      const props = JSON.parse(readFileSync(join(out, "render-props.json"), "utf8"));
+      const manifest = JSON.parse(readFileSync(join(out, "production.json"), "utf8"));
+      const audit = JSON.parse(readFileSync(join(out, "planning.json"), "utf8"));
+      expect(ir).toEqual(JSON.parse(before));
+      expect(readFileSync(sourcePath, "utf8")).toBe(before);
+      expect(props.plan.shots.reduce((sum: number, shot: { durationSec: number }) => sum + shot.durationSec, 0)).toBe(13);
+      expect(manifest).toMatchObject({ inputMode: "saved-project", status: "planned", usageCharged: false });
+      expect(audit.spendStatus).toBe("no-live-calls");
+      const fromFile = join(temp, "from-file");
+      execFileSync(process.execPath, [...cli, "--project", sourcePath, "--out", fromFile], { cwd: root });
+      expect(JSON.parse(readFileSync(join(fromFile, "product-ir.json"), "utf8"))).toEqual(ir);
+      const briefPath = join(temp, "brief.json");
+      const customBrief = JSON.parse(readFileSync(join(root, "fixtures/design.brief.json"), "utf8"));
+      customBrief.headline = "A fresh direction.";
+      writeFileSync(briefPath, JSON.stringify(customBrief));
+      const overridden = join(temp, "overridden");
+      execFileSync(process.execPath, [...cli, "--project", sourcePath, "--brief", briefPath, "--out", overridden], { cwd: root });
+      const overrideIR = JSON.parse(readFileSync(join(overridden, "product-ir.json"), "utf8"));
+      expect(overrideIR.copy.headline).toBe("A fresh direction.");
+      expect(overrideIR.screens).toEqual(ir.screens);
+      expect(overrideIR.source).toEqual(ir.source);
+      const overwrite = spawnSync(process.execPath, [...cli, "--project", original, "--out", original], { cwd: root, encoding: "utf8" });
+      expect(overwrite.status).toBe(1);
+      expect(overwrite.stderr).toContain("already exists");
+      expect(readFileSync(sourcePath, "utf8")).toBe(before);
+    } finally { rmSync(temp, { recursive: true, force: true }); }
+  });
+  it("rejects ambiguous project/import modes before opening inputs", () => {
+    for (const flags of [
+      ["--project", "missing", "--figma", "missing"],
+      ["--project", "missing", "--screenshot", "missing"],
+      ["--project", "missing", "--layers"],
+      ["--project", "missing", "--figma-json", "missing"],
+    ]) {
+      const result = spawnSync(process.execPath, [...cli, ...flags], { cwd: root, encoding: "utf8" });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toMatch(/Choose exactly one input|already contain their design assets/);
+    }
+  });
   it("persists a layer scene and source-node report for offline reconstruction", () => {
     const temp = mkdtempSync(join(tmpdir(), "vivid-layered-"));
     try {

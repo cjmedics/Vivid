@@ -86,3 +86,17 @@ jobs:
           path: out/layered-sample/
           if-no-files-found: error
           retention-days: 14
+      - name: Reopen saved project and render a new timing without Figma
+        env:
+          FIGMA_ACCESS_TOKEN: ''
+          OPENAI_API_KEY: ''
+          ANTHROPIC_API_KEY: ''
+        run: npm run create -- --project out/layered-sample --pacing fixtures/pacing.brisk.json --out out/reopened-sample --render
+      - name: Verify saved-project MP4
+        run: node scripts/verify-video.mjs out/reopened-sample/render-props.json out/reopened-sample/video.mp4 out/reopened-sample/probe.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vivid-reopened-project-fixture
+          path: out/reopened-sample/
+          if-no-files-found: error
+          retention-days: 14
