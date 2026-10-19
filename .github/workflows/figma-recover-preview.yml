@@ -1,0 +1,42 @@
+name: Recover saved Vivid MP4
+on:
+  push:
+    branches: ['deliver/figma-recover-*']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Recover existing MP4 and attach it to an unpublished draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DELIVERY_KEY: ${{ secrets.FIGMA_DELIVERY_PRIVATE_KEY }}
+          PREVIEW_TAG: vivid-private-recovery-${{ github.run_id }}
+        shell: bash
+        run: |
+          if [ -z "$DELIVERY_KEY" ]; then
+            echo "Add the FIGMA_DELIVERY_PRIVATE_KEY repository secret to recover the saved video."
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$DELIVERY_KEY" > "$RUNNER_TEMP/delivery-key.pem"
+          gh run download 39251046104 --repo "$GITHUB_REPOSITORY" --name vivid-figma-production-encrypted --dir "$RUNNER_TEMP/encrypted"
+          openssl cms -decrypt -binary -inform DER -in "$RUNNER_TEMP/encrypted/figma-production.cms" -inkey "$RUNNER_TEMP/delivery-key.pem" -out "$RUNNER_TEMP/production.tar.gz"
+          mkdir -p "$RUNNER_TEMP/recovered"
+          tar -xzf "$RUNNER_TEMP/production.tar.gz" -C "$RUNNER_TEMP/recovered"
+          test -s "$RUNNER_TEMP/recovered/production/video.mp4"
+          cp "$RUNNER_TEMP/recovered/production/video.mp4" "$RUNNER_TEMP/vivid-layer-motion.mp4"
+          cat > "$RUNNER_TEMP/preview-notes.txt" <<'NOTES'
+          Private preview recovered from the verified Vivid layer render.
+          Download vivid-layer-motion.mp4 below to watch the 19-second, 1080p result.
+          This release must remain a draft; publishing would make the video public.
+          NOTES
+          gh release create "$PREVIEW_TAG" "$RUNNER_TEMP/vivid-layer-motion.mp4" --repo "$GITHUB_REPOSITORY" --draft --target main --title "Vivid layer motion — private MP4 preview" --notes-file "$RUNNER_TEMP/preview-notes.txt"
+          test "$(gh release view "$PREVIEW_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = true
+          gh release view "$PREVIEW_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url'
