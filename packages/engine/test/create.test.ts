@@ -48,4 +48,25 @@ describe("create command", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("FIGMA_ACCESS_TOKEN");
   });
+  it("replays reviewed suggestions without live credentials and records the chosen copy", () => {
+    const temp = mkdtempSync(join(tmpdir(), "vivid-replay-"));
+    try {
+      const out = join(temp, "production");
+      execFileSync(process.execPath, [...cli, ...common, ...figma, "--planner-replay", "fixtures/planner.suggestions.json", "--accept-copy", "--out", out], {
+        cwd: root, env: { ...process.env, OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "" },
+      });
+      const audit = JSON.parse(readFileSync(join(out, "planning.json"), "utf8"));
+      const props = JSON.parse(readFileSync(join(out, "render-props.json"), "utf8"));
+      expect(audit).toMatchObject({ mode: "replay", copyAccepted: true, spendStatus: "no-live-calls" });
+      expect(props.plan.copy.headline).toBe("Your next launch, brought into focus.");
+      expect(props.plan.shots[2].primitives[1].targetRegionId).toBe("3:3");
+    } finally { rmSync(temp, { recursive: true, force: true }); }
+  });
+  it("rejects missing planner credentials before a live Figma import", () => {
+    const result = spawnSync(process.execPath, [...cli, ...common, "--figma", "https://www.figma.com/design/abc/Design?node-id=1-2", "--planner", "openai"], {
+      cwd: root, encoding: "utf8", env: { ...process.env, OPENAI_API_KEY: "", FIGMA_ACCESS_TOKEN: "" },
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Planner API key is missing");
+  });
 });

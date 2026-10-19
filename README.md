@@ -12,6 +12,7 @@ npm run demo -- --outage # OpenRouter down → router falls back to Higgsfield
 npm run render:demo      # writes out/demo.mp4 via Remotion
 npm run studio           # Remotion Studio
 npm run create:sample -- --render  # offline Figma-shaped fixture → real image → MP4
+npm run create:planned-sample -- --render # reviewed choreography/copy replay → MP4 (no model calls)
 ```
 
 ## Layout
@@ -37,6 +38,19 @@ brand assets, screenshot fallback, and current limitations. The checked-in sampl
 a purpose-built fixture, not a live customer Figma import. Live account access still
 needs an authorized frame link and `FIGMA_ACCESS_TOKEN`.
 
+## AI choreography and copy
+
+Optional OpenAI Responses and Anthropic Messages adapters select a bounded motion
+recipe and draft copy. The application compiles that recipe into a validated
+ShotPlan; models cannot replace assets, branding, coordinates, or generation routes.
+Rules remain the default. Failed or invalid model output falls back to the existing
+deterministic plan, with usage and failure details retained for review. Copy is saved
+as a suggestion and accepted through a separate, token-free replay command.
+
+See [AI planning](docs/ai-planning.md) for provider configuration, role/model choices,
+review, request limits, audit output, and the distinction between contract-tested
+adapters, hand-authored replay fixtures, and live account validation.
+
 ## Decisions encoded
 
 - **Pricing (USD):** Starter $39 / 10 BM / 20 RU · Pro $119 / 35 BM / 60 RU · Studio $299 / 100 BM / 200 RU.
@@ -47,4 +61,4 @@ needs an authorized frame link and `FIGMA_ACCESS_TOKEN`.
 
 ## Not built yet
 
-Browser capture, the LLM planner (presets and focal ranking are rule-based today), Cloudflare Workers/Workflows/Queues wiring, Postgres ledger (must match `InMemoryLedger` semantics), billing, auth, web UI, real quality validators, Higgsfield adapter, and syncing the catalog from live provider APIs. The create command saves local estimates and render status; it does not charge customer usage or replace the production billing lifecycle.
+Browser capture, multimodal screenshot understanding, live planner account validation and quality/cost evaluation, Cloudflare Workers/Workflows/Queues wiring, Postgres ledger (must match `InMemoryLedger` semantics), billing, auth, web UI, real quality validators, Higgsfield adapter, and syncing the catalog from live provider APIs. The create command saves local estimates and render status; it does not charge customer usage or replace the production billing lifecycle.

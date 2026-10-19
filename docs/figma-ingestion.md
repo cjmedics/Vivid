@@ -91,7 +91,8 @@ is a later integration. PNG captures are limited to 20 MiB.
   out-of-shot timing, and simulated data changes on static captures.
 - Design Reveal shows the frame, focuses on up to three distinct areas, and closes
   with a CTA. Layer names and geometry drive heuristic classification/ranking; there
-  is no LLM or claim of semantic understanding. Missing metrics do not block a reveal.
+  is no visual model inference in ingestion. Optional [AI planning](ai-planning.md) can
+  select the viewing order from structured annotations. Missing metrics do not block a reveal.
 - This is a static-frame presentation. It does not animate individual Figma layers,
   infer interaction outcomes, modify screenshot values, or reproduce product behavior.
 - The MVP create command exports only 16:9, at the account's production resolution
