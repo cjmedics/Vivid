@@ -28,6 +28,8 @@ export function reconstructLayers(svg: string, frame: FigmaNode): LayerScene {
     const attrs: Record<string, string> = {};
     for (let i = 0; i < el.attributes.length; i++) {
       const a = el.attributes.item(i)!;
+      // Descriptive data attributes have no visual role; keep the source-node mapping only.
+      if (a.name.startsWith("data-") && a.name !== "data-node-id") continue;
       if (!safeSvgAttribute(a.name, a.value)) throw new Error("Unsupported or external attribute in Figma SVG export");
       attrs[a.name] = a.value;
     }

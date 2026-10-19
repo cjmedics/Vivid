@@ -48,6 +48,7 @@ describe("Figma layer reconstruction", () => {
     expect(s.layers.find((l) => l.nodeId === "image-1")?.kind).toBe("image");
     expect(JSON.stringify(s.root)).toContain("url(#crop)");
     expect(JSON.stringify(s.root)).toContain("translate(10 10)");
+    expect(JSON.stringify(s.root)).not.toContain("Photograph metadata");
   });
   it("rejects dangling, nested and duplicate animated layer references", () => {
     const s = scene();
