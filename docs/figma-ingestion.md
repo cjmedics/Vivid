@@ -93,8 +93,9 @@ is a later integration. PNG captures are limited to 20 MiB.
   with a CTA. Layer names and geometry drive heuristic classification/ranking; there
   is no visual model inference in ingestion. Optional [AI planning](ai-planning.md) can
   select the viewing order from structured annotations. Missing metrics do not block a reveal.
-- This is a static-frame presentation. It does not animate individual Figma layers,
-  infer interaction outcomes, modify screenshot values, or reproduce product behavior.
+- Screenshot mode presents a static frame. Optional SVG layer reconstruction animates
+  independent source elements; neither mode invents interaction outcomes, modifies
+  product values, or reproduces working product behavior.
 - The MVP create command exports only 16:9, at the account's production resolution
   (720p on Starter, 1080p on Pro). It adds no audio, UI, subscriptions, or durable jobs.
 - Production asset storage, billing finalization, and live-model routing remain separate
@@ -102,3 +103,58 @@ is a later integration. PNG captures are limited to 20 MiB.
 
 Live API behavior is contract-tested with mocked responses. Real account access,
 export permissions, and limits must be checked with an authorized customer frame.
+
+## Layer reconstruction and entrances
+
+Add `--layers` to a live import. Vivid requests an additional SVG export of the same
+file version with `svg_outline_text=true`, `svg_include_node_id=true`, and
+`use_absolute_bounds=true`. Outlining preserves source glyphs without requiring the
+design fonts on the render worker. Text is vector artwork, not editable typography.
+
+The engine parses SVG into an allowlisted scene tree. It retains paint order, nested
+transforms, shapes, gradients, embedded raster images, masks, and clipping references.
+Scripts, foreign objects, external resources, and unsupported SVG features fail
+explicitly. It does not silently replace a failed layer import with a screenshot.
+
+Source node IDs match exported elements to Figma metadata. Up to 120 visible text,
+image, and component nodes receive staggered entrances. Components animate as units;
+their children remain intact and do not receive a second entrance. Other artwork and
+definitions stay static. Text and components rise into position; images reveal through
+a mask. Timing depends only on the current frame and finishes within the overview
+beat. Later focus shots show the fully reconstructed design without repeating entrances.
+
+`product-ir.json` and `render-props.json` embed the vector scene and its images;
+`layer-report.json` lists independently animated source IDs and kinds. Live imports
+also preserve `source.nodes.json`, `source.capture.png`, and `source.layers.svg`
+alongside the production so further work can run offline without consuming API quota.
+
+Offline example:
+
+```bash
+npm run create -- --figma 'https://www.figma.com/design/FILE_KEY/Design?node-id=1-2' \
+  --figma-json path/to/source.nodes.json --capture path/to/source.capture.png \
+  --layers --figma-svg path/to/source.layers.svg \
+  --brand path/to/brand.json --brief path/to/brief.json --out out/layered --render
+```
+
+`npm run create:layered-sample -- --render` exercises a purpose-built SVG fixture.
+It is not a pixel-matched version of the older PNG fixture. The live workflow also
+renders `reconstructed-frame.png` using the `VividLayerReference` composition for
+comparison with the original export. At the owner's request, the MP4 is saved
+without video encryption as `vivid-layer-motion.mp4` in an unpublished draft release.
+Download that MP4 directly; no certificate, private key, or decryption secret is
+needed to watch a new render. The workflow never publishes the release, keeping the
+video restricted to repository writers rather than exposing it in public-repository
+workflow artifacts.
+
+The separate full-source backup remains encrypted because it includes Figma nodes,
+SVGs and production metadata beyond the approved MP4 preview. Its encryption does
+not block the direct MP4 delivery step, which runs first. The validation script does
+not delete source files or overwrite previous productions. Legacy encrypted archives
+are preserved unchanged and still require their original key. Backup workflow
+artifacts expire after 90 days; draft-release MP4s remain until explicitly removed.
+
+This first layer milestone is deterministic scene reconstruction, not text reflow,
+word/character animation inside outlined text, interaction inference, or AI art direction.
+Source geometry and supported SVG effects remain authoritative; choreography is
+heuristic. More complex unsupported SVG exports require importer extensions.

@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -23,7 +23,8 @@ try {
   const briefPath = resolve(temporary, "brief.json");
   writeFileSync(briefPath, JSON.stringify({ productName: "Your design", description: "A motion showcase of the supplied Figma frame.", category: "Design", headline: "Your design in motion", subtext: "Every detail in focus.", cta: "Explore the design" }));
   const output = resolve(temporary, "production");
-  const created = spawnSync(process.execPath, ["--import", "tsx", "apps/create/src/main.ts", "--figma", frame.href, "--brand", "fixtures/design.brand.json", "--brief", briefPath, "--planner", "rules", "--out", output, "--render"], {
+  const layered = process.env.VIVID_LAYERED_RENDER === "true";
+  const created = spawnSync(process.execPath, ["--import", "tsx", "apps/create/src/main.ts", "--figma", frame.href, "--brand", "fixtures/design.brand.json", "--brief", briefPath, "--planner", "rules", "--out", output, ...(layered ? ["--layers"] : []), "--render"], {
     cwd: root, env: { ...process.env, FIGMA_ACCESS_TOKEN: token }, encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 15 * 60 * 1000, maxBuffer: 1024 * 1024,
   });
   // Never forward renderer output, node names, URLs, tokens, or provider responses to public logs.
@@ -33,10 +34,20 @@ try {
     if (diagnostic) console.log(`Figma API diagnostic: HTTP ${diagnostic[1]}; stage=${diagnostic[2]}; reason=${diagnostic[3]}.`);
     if (detail.includes("Figma access denied.")) throw new Error("Figma denied access. Check the token, file_content:read scope, and access to the selected file.");
     if (detail.includes("Figma rate limit reached.")) throw new Error("Figma API quota reached. Wait for the provider quota reset before another attempt.");
+    if (detail.includes("Unsupported element in Figma SVG")) throw new Error("Figma SVG includes an element not supported by the layer importer.");
+    if (detail.includes("Unsupported or external attribute")) throw new Error("Figma SVG includes an unsupported or external attribute.");
+    if (detail.includes("independently addressable")) throw new Error("Figma SVG did not preserve independently addressable node IDs.");
     throw new Error("Live import or render failed. No raw design data or process logs were published.");
   }
   const manifest = JSON.parse(readFileSync(resolve(output, "production.json"), "utf8"));
   if (manifest.inputMode !== "live-figma" || manifest.status !== "rendered") throw new Error("Live import did not produce a completed render.");
+  if (layered) {
+    const report = JSON.parse(readFileSync(resolve(output, "layer-report.json"), "utf8"));
+    console.log(`Reconstructed ${Number(report.animatedLayerCount)} independent source layers.`);
+    const cli = resolve(dirname(fileURLToPath(import.meta.resolve("@remotion/cli/package.json"))), "remotion-cli.js");
+    const still = spawnSync(process.execPath, [cli, "still", "src/index.ts", "VividLayerReference", resolve(output, "reconstructed-frame.png"), `--props=${resolve(output, "render-props.json")}`], { cwd: resolve(root, "packages/renderer"), stdio: "ignore", timeout: 120000 });
+    if (still.error || still.status !== 0) throw new Error("Settled layer reconstruction reference could not be rendered.");
+  }
   const verified = spawnSync(process.execPath, ["scripts/verify-video.mjs", resolve(output, "render-props.json"), resolve(output, "video.mp4"), resolve(output, "probe.json")], {
     cwd: root, stdio: "ignore", timeout: 120000,
   });

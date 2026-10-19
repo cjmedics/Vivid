@@ -24,6 +24,7 @@ export const MotionPrimitive = z.object({
 export type MotionPrimitive = z.infer<typeof MotionPrimitive>;
 
 export const MOTION_LIBRARY: MotionPrimitive[] = [
+  { id: "presentation/layer-entrance", category: "presentation", compatibleWith: ["screen"], duration: { min: 1, max: 6 }, energy: "medium", brandSafety: "high", renderer: "deterministic" },
   { id: "presentation/region-highlight", category: "presentation", compatibleWith: ["any"], duration: { min: 0.8, max: 3 }, energy: "low", brandSafety: "high", renderer: "deterministic" },
   { id: "typography/line-reveal", category: "typography", compatibleWith: ["headline", "text"], duration: { min: 0.8, max: 3 }, energy: "low", brandSafety: "high", renderer: "deterministic" },
   { id: "typography/word-reveal", category: "typography", compatibleWith: ["headline", "subtext"], duration: { min: 1, max: 4 }, energy: "medium", brandSafety: "high", renderer: "deterministic" },

@@ -17,8 +17,11 @@ jobs:
   live-import:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: write
     env:
       VIVID_OUTPUT_ROOT: /tmp/vivid-production
+      VIVID_LAYERED_RENDER: 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,6 +38,21 @@ jobs:
           FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
           FIGMA_FRAME_URL: ${{ inputs.frame_url || vars.FIGMA_FRAME_URL || 'https://www.figma.com/design/gg58zkz3HwncQsCenBlSII/Untitled?node-id=2-197' }}
         run: node scripts/validate-figma-live.mjs
+      - name: Save unencrypted MP4 in an unpublished draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_TAG: vivid-private-preview-${{ github.run_id }}
+        shell: bash
+        run: |
+          cp "$VIVID_OUTPUT_ROOT/production/video.mp4" "$VIVID_OUTPUT_ROOT/vivid-layer-motion.mp4"
+          cat > "$RUNNER_TEMP/preview-notes.txt" <<'NOTES'
+          Vivid MP4 preview, saved without video encryption at the owner's request.
+          Download vivid-layer-motion.mp4 to watch the result directly.
+          Keep this release unpublished; publishing it would make the video public.
+          NOTES
+          gh release create "$PREVIEW_TAG" "$VIVID_OUTPUT_ROOT/vivid-layer-motion.mp4" --repo "$GITHUB_REPOSITORY" --draft --target main --title "Vivid private MP4 preview" --notes-file "$RUNNER_TEMP/preview-notes.txt"
+          test "$(gh release view "$PREVIEW_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" = true
+          gh release view "$PREVIEW_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url'
       - name: Preserve production files in an encrypted archive
         if: always()
         shell: bash
