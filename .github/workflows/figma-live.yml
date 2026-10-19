@@ -1,0 +1,36 @@
+name: Validate live Figma import
+
+on:
+  push:
+    branches: ['validate/figma-live-*']
+  workflow_dispatch:
+    inputs:
+      frame_url:
+        description: Authorized Figma frame link
+        required: true
+        default: 'https://www.figma.com/design/gg58zkz3HwncQsCenBlSII/Untitled?node-id=2-197'
+
+permissions:
+  contents: read
+
+jobs:
+  live-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install media verification tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Import authorized frame, render MP4, and decode every frame
+        env:
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+          FIGMA_FRAME_URL: ${{ inputs.frame_url || vars.FIGMA_FRAME_URL || 'https://www.figma.com/design/gg58zkz3HwncQsCenBlSII/Untitled?node-id=2-197' }}
+        run: node scripts/validate-figma-live.mjs
+      # No artifact upload: design data and video are deleted after verification.
