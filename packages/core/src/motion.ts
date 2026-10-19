@@ -24,9 +24,10 @@ export const MotionPrimitive = z.object({
 export type MotionPrimitive = z.infer<typeof MotionPrimitive>;
 
 export const MOTION_LIBRARY: MotionPrimitive[] = [
+  { id: "presentation/region-highlight", category: "presentation", compatibleWith: ["any"], duration: { min: 0.8, max: 3 }, energy: "low", brandSafety: "high", renderer: "deterministic" },
   { id: "typography/line-reveal", category: "typography", compatibleWith: ["headline", "text"], duration: { min: 0.8, max: 3 }, energy: "low", brandSafety: "high", renderer: "deterministic" },
   { id: "typography/word-reveal", category: "typography", compatibleWith: ["headline", "subtext"], duration: { min: 1, max: 4 }, energy: "medium", brandSafety: "high", renderer: "deterministic" },
-  { id: "camera/push-in", category: "camera", compatibleWith: ["screen", "metric", "chart", "card"], duration: { min: 1, max: 4 }, energy: "medium", brandSafety: "high", renderer: "deterministic" },
+  { id: "camera/push-in", category: "camera", compatibleWith: ["screen", "metric", "chart", "card", "hero", "text", "button", "input", "image", "table"], duration: { min: 1, max: 4 }, energy: "medium", brandSafety: "high", renderer: "deterministic" },
   { id: "camera/pull-out", category: "camera", compatibleWith: ["screen"], duration: { min: 1, max: 4 }, energy: "low", brandSafety: "high", renderer: "deterministic" },
   { id: "interaction/cursor-click", category: "interaction", compatibleWith: ["button", "input", "card"], duration: { min: 0.8, max: 2.5 }, energy: "medium", brandSafety: "high", renderer: "deterministic" },
   { id: "interaction/hover-focus", category: "interaction", compatibleWith: ["button", "card", "metric"], duration: { min: 0.5, max: 2 }, energy: "low", brandSafety: "high", renderer: "deterministic" },

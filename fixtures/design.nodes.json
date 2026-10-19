@@ -1,0 +1,146 @@
+{
+  "name": "Vivid offline fixture (not fetched from Figma)",
+  "version": "fixture-v1",
+  "nodes": {
+    "1:2": {
+      "document": {
+        "id": "1:2",
+        "name": "Launchboard workspace",
+        "type": "FRAME",
+        "absoluteBoundingBox": {
+          "x": 100,
+          "y": 200,
+          "width": 1200,
+          "height": 750
+        },
+        "children": [
+          {
+            "id": "2:1",
+            "name": "Navigation",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 100,
+              "y": 200,
+              "width": 1200,
+              "height": 84
+            }
+          },
+          {
+            "id": "2:2",
+            "name": "Sidebar",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 100,
+              "y": 284,
+              "width": 210,
+              "height": 666
+            }
+          },
+          {
+            "id": "2:3",
+            "name": "Heading",
+            "type": "TEXT",
+            "absoluteBoundingBox": {
+              "x": 352,
+              "y": 326,
+              "width": 850,
+              "height": 42
+            },
+            "characters": "Make room for your next big idea.",
+            "style": {
+              "fontFamily": "DejaVu Sans",
+              "fontSize": 30
+            }
+          },
+          {
+            "id": "3:1",
+            "name": "Feature card 1",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 352,
+              "y": 446,
+              "width": 272,
+              "height": 368
+            },
+            "children": [
+              {
+                "id": "4:1",
+                "name": "Plan the work",
+                "type": "TEXT",
+                "absoluteBoundingBox": {
+                  "x": 376,
+                  "y": 478,
+                  "width": 224,
+                  "height": 28
+                },
+                "characters": "Plan the work",
+                "style": {
+                  "fontFamily": "DejaVu Sans",
+                  "fontSize": 20
+                }
+              }
+            ]
+          },
+          {
+            "id": "3:2",
+            "name": "Feature card 2",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 652,
+              "y": 446,
+              "width": 272,
+              "height": 368
+            },
+            "children": [
+              {
+                "id": "4:2",
+                "name": "Bring the team",
+                "type": "TEXT",
+                "absoluteBoundingBox": {
+                  "x": 676,
+                  "y": 478,
+                  "width": 224,
+                  "height": 28
+                },
+                "characters": "Bring the team",
+                "style": {
+                  "fontFamily": "DejaVu Sans",
+                  "fontSize": 20
+                }
+              }
+            ]
+          },
+          {
+            "id": "3:3",
+            "name": "Feature card 3",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 952,
+              "y": 446,
+              "width": 272,
+              "height": 368
+            },
+            "children": [
+              {
+                "id": "4:3",
+                "name": "Share the launch",
+                "type": "TEXT",
+                "absoluteBoundingBox": {
+                  "x": 976,
+                  "y": 478,
+                  "width": 224,
+                  "height": 28
+                },
+                "characters": "Share the launch",
+                "style": {
+                  "fontFamily": "DejaVu Sans",
+                  "fontSize": 20
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

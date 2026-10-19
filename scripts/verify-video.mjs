@@ -1,0 +1,21 @@
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+
+const [propsPath, videoPath, probePath] = process.argv.slice(2);
+if (!propsPath || !videoPath || !probePath) throw new Error("Usage: node scripts/verify-video.mjs <props.json> <video.mp4> <probe.json>");
+const props = JSON.parse(readFileSync(propsPath, "utf8"));
+const metadata = execFileSync("ffprobe", ["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,r_frame_rate,nb_read_frames:format=duration", "-of", "json", videoPath], { encoding: "utf8" });
+const probe = JSON.parse(metadata);
+const stream = probe.streams[0];
+const frames = props.plan.shots.reduce((sum, s) => sum + Math.round(s.durationSec * props.plan.fps), 0);
+assert.equal(stream.codec_name, "h264");
+assert.equal(stream.width, props.width);
+assert.equal(stream.height, props.height);
+assert.equal(Number(stream.nb_read_frames), frames);
+const [num, den] = stream.r_frame_rate.split("/").map(Number);
+assert.equal(num / den, props.plan.fps);
+assert.ok(Math.abs(Number(probe.format.duration) - frames / props.plan.fps) < 1 / props.plan.fps);
+execFileSync("ffmpeg", ["-v", "error", "-xerror", "-i", videoPath, "-f", "null", "-"], { stdio: "inherit" });
+writeFileSync(probePath, metadata);
+console.log(`Verified ${stream.width}x${stream.height}, ${frames} frames, ${probe.format.duration}s; full decode passed.`);
