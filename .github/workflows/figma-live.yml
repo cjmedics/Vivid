@@ -19,6 +19,7 @@ jobs:
     timeout-minutes: 20
     env:
       VIVID_OUTPUT_ROOT: /tmp/vivid-production
+      VIVID_LAYERED_RENDER: 'true'
     steps:
       - uses: actions/checkout@v4
         with:

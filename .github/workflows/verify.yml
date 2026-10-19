@@ -76,3 +76,13 @@ jobs:
           path: out/planned-sample/
           if-no-files-found: error
           retention-days: 14
+      - name: Render independently animated Figma layer fixture
+        run: npm run create:layered-sample -- --render
+      - name: Verify layered MP4
+        run: node scripts/verify-video.mjs out/layered-sample/render-props.json out/layered-sample/video.mp4 out/layered-sample/probe.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vivid-layered-fixture
+          path: out/layered-sample/
+          if-no-files-found: error
+          retention-days: 14

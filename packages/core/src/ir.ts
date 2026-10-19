@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LayerScene } from "./layers.js";
 
 /**
  * Product IR: what the Context Engine knows about the customer's product.
@@ -59,6 +60,8 @@ export const Screen = z.object({
   /** Original frame dimensions; normalized region coordinates map to these pixels. */
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
+  /** Reconstructed source layers; captureUrl remains a reference and fallback. */
+  layerScene: LayerScene.optional(),
   regions: z.array(Region),
 });
 export type Screen = z.infer<typeof Screen>;

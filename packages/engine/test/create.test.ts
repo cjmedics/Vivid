@@ -11,6 +11,18 @@ const common = ["--brand", "fixtures/design.brand.json", "--brief", "fixtures/de
 const figma = ["--figma", "https://www.figma.com/design/VividFixture/Launchboard?node-id=1-2", "--figma-json", "fixtures/design.nodes.json", "--capture", "fixtures/design.capture.png"];
 
 describe("create command", () => {
+  it("persists a layer scene and source-node report for offline reconstruction", () => {
+    const temp = mkdtempSync(join(tmpdir(), "vivid-layered-"));
+    try {
+      const out = join(temp, "production");
+      execFileSync(process.execPath, [...cli, ...common, ...figma, "--layers", "--figma-svg", "fixtures/design.layers.svg", "--out", out], { cwd: root });
+      const props = JSON.parse(readFileSync(join(out, "render-props.json"), "utf8"));
+      const report = JSON.parse(readFileSync(join(out, "layer-report.json"), "utf8"));
+      expect(props.plan.screens[0].layerScene.root.tag).toBe("svg");
+      expect(report.animatedLayerCount).toBeGreaterThan(1);
+      expect(report.layers.some((l: { kind: string }) => l.kind === "text")).toBe(true);
+    } finally { rmSync(temp, { recursive: true, force: true }); }
+  });
   it("writes a portable plan and quote without billing; refuses to overwrite a prior production", () => {
     const temp = mkdtempSync(join(tmpdir(), "vivid-create-"));
     try {

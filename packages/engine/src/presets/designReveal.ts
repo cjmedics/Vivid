@@ -33,6 +33,7 @@ export function buildDesignReveal(input: ProductIR, options: { pacing?: unknown;
   };
   add("establish", pacing.introSec, [{ primitiveId: choice?.typography ?? "typography/word-reveal", startSec: 0.2, durationSec: pacing.introSec - 0.4, params: { slot: "headline" } }]);
   add("establish-screen", pacing.overviewSec, [
+    ...(screen.layerScene ? [{ primitiveId: "presentation/layer-entrance", startSec: 0, durationSec: pacing.overviewSec, screenId: screen.id, params: {} }] : []),
     { primitiveId: "camera/pull-out", startSec: 0, durationSec: pacing.overviewSec, screenId: screen.id, params: {} },
     { primitiveId: "typography/line-reveal", startSec: 0.5, durationSec: 1.5, params: { slot: "subtext" } },
   ]);

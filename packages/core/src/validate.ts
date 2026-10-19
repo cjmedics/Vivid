@@ -11,6 +11,7 @@ export function validateShotPlan(input: unknown): ShotPlan {
   for (const s of screens) {
     unique(s.regions.map((r) => r.id), `region in ${s.id}`);
     if (s.captureUrl && (!s.width || !s.height)) throw new Error(`${s.id}: captured screens need original dimensions`);
+    if (s.layerScene && (s.layerScene.width !== s.width || s.layerScene.height !== s.height)) throw new Error(`${s.id}: layer scene dimensions must match the screen`);
   }
   for (const shot of plan.shots) {
     if (Math.round(shot.durationSec * plan.fps) < 1) throw new Error(`${shot.id}: shot must occupy a frame`);
@@ -22,6 +23,7 @@ export function validateShotPlan(input: unknown): ShotPlan {
       if (spatial && p.primitiveId !== "camera/pull-out" && !p.targetRegionId) throw new Error(`${shot.id}: ${p.primitiveId} needs a target region`);
       if (p.startSec + p.durationSec > shot.durationSec + 1e-6) throw new Error(`${shot.id}: primitive extends beyond shot`);
       const screen = screens.find((s) => s.id === p.screenId);
+      if (p.primitiveId === "presentation/layer-entrance" && (!screen?.layerScene || !p.screenId)) throw new Error(`${shot.id}: layer entrance needs a reconstructed screen`);
       if (p.screenId && !screen) throw new Error(`${shot.id}: unknown screen ${p.screenId}`);
       const region = screen?.regions.find((r) => r.id === p.targetRegionId);
       if (p.targetRegionId && !region) throw new Error(`${shot.id}: unknown target ${p.targetRegionId}`);

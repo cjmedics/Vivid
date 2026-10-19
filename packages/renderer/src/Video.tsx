@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { AbsoluteFill, Img, OffthreadVideo, Sequence, cancelRender, continueRender, delayRender, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { SyntheticScreen, mix, type ScreenOverrides } from "./SyntheticScreen";
+import { LayeredScreen } from "./LayeredScreen";
 import { cameraFor, cameraTransform, find, progress, regionOf, tickValue } from "./primitives";
 import type { ShotAsset, Shot, ShotPlan, VividProps } from "./types";
 
@@ -76,6 +77,7 @@ const ShotView: React.FC<{ shot: Shot; plan: ShotPlan; asset: ShotAsset }> = ({ 
   const subtext = shot.primitives.find((p) => p.primitiveId.startsWith("typography/") && p.params.slot === "subtext");
   const cta = find(shot, "presentation/cta-card");
   const highlight = find(shot, "presentation/region-highlight");
+  const layerEntrance = find(shot, "presentation/layer-entrance");
   const highlightRegion = regionOf(screen, highlight?.targetRegionId);
   const aspect = screen?.width && screen.height ? screen.width / screen.height : 16 / 10;
   const screenWidth = Math.min(width * 0.84, height * (subtext ? 0.65 : 0.78) * aspect);
@@ -100,7 +102,9 @@ const ShotView: React.FC<{ shot: Shot; plan: ShotPlan; asset: ShotAsset }> = ({ 
             }}
           >
             <div style={{ position: "absolute", inset: 0, transform: cameraTransform(cameraFor(shot, screen, t)) }}>
-              {screen.captureUrl
+              {screen.layerScene
+                ? <LayeredScreen scene={screen.layerScene} seconds={t - (layerEntrance?.startSec ?? 0)} entranceSec={layerEntrance?.durationSec} idPrefix={shot.id} />
+                : screen.captureUrl
                 ? <Img src={screen.captureUrl} style={{ width: "100%", height: "100%", objectFit: "fill", display: "block" }} />
                 : <SyntheticScreen screen={screen} brand={brand} overrides={overrides} />}
               {highlightRegion && highlight && <div style={{

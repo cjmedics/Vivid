@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" fill="none">
+  <g data-node-id="1:2">
+    <rect width="1200" height="750" fill="#0b1020" />
+    <g data-node-id="2:1"><rect width="1200" height="84" fill="#141c32"/><text x="28" y="52" fill="#f8fafc" font-family="DejaVu Sans" font-size="28">Launchboard</text></g>
+    <g data-node-id="2:2"><rect y="84" width="210" height="666" fill="#11182a"/><text x="28" y="155" fill="#a8b7d0" font-family="DejaVu Sans" font-size="18">Workspace</text></g>
+    <g data-node-id="2:3"><text x="252" y="160" fill="#f8fafc" font-family="DejaVu Sans" font-size="34" font-weight="700">Make room for your next big idea.</text></g>
+    <g data-node-id="3:1"><rect x="252" y="246" width="272" height="368" rx="18" fill="#192340"/><g data-node-id="4:1"><text x="276" y="302" fill="#f8fafc" font-family="DejaVu Sans" font-size="22">Plan the work</text></g><rect x="276" y="340" width="224" height="12" rx="6" fill="#6366f1"/><rect x="276" y="370" width="160" height="12" rx="6" fill="#6366f1"/></g>
+    <g data-node-id="3:2"><rect x="552" y="246" width="272" height="368" rx="18" fill="#192340"/><g data-node-id="4:2"><text x="576" y="302" fill="#f8fafc" font-family="DejaVu Sans" font-size="22">Bring the team</text></g><circle cx="604" cy="402" r="28" fill="#2dd4bf"/><circle cx="664" cy="402" r="28" fill="#6366f1"/><circle cx="724" cy="402" r="28" fill="#8293bd"/></g>
+    <g data-node-id="3:3"><rect x="852" y="246" width="272" height="368" rx="18" fill="#192340"/><g data-node-id="4:3"><text x="876" y="302" fill="#f8fafc" font-family="DejaVu Sans" font-size="22">Share the launch</text></g><rect x="876" y="370" width="224" height="64" rx="12" fill="#2dd4bf"/></g>
+  </g>
+</svg>

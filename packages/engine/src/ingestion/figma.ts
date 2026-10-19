@@ -1,13 +1,15 @@
 import { z } from "zod";
 import { BrandKit, ProductIR, VideoBrief, type Region, type RegionKind } from "@vivid/core";
+import { downloadSvg, reconstructLayers } from "./layers.js";
 
-interface FigmaNode {
+export interface FigmaNode {
   id: string;
   name: string;
   type: string;
   visible?: boolean;
   opacity?: number;
   clipsContent?: boolean;
+  isMask?: boolean;
   characters?: string;
   absoluteBoundingBox?: { x: number; y: number; width: number; height: number };
   style?: { fontFamily?: string; fontSize?: number };
@@ -18,6 +20,7 @@ interface FigmaNode {
 const Node: z.ZodType<FigmaNode> = z.lazy(() => z.object({
   id: z.string().min(1), name: z.string(), type: z.string(),
   visible: z.boolean().optional(), opacity: z.number().optional(), clipsContent: z.boolean().optional(), characters: z.string().optional(),
+  isMask: z.boolean().optional(),
   absoluteBoundingBox: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).optional(),
   style: z.object({ fontFamily: z.string().optional(), fontSize: z.number().optional() }).optional(),
   fills: z.array(z.object({
@@ -58,7 +61,7 @@ export function parseFigmaUrl(value: string): FigmaReference {
 
 /** Snapshot and live ingestion share this exact transformation. No fabricated interaction states. */
 export function figmaToProduct(input: {
-  reference: FigmaReference; nodesResponse: unknown; captureDataUrl: string; brand: unknown; brief: unknown;
+  reference: FigmaReference; nodesResponse: unknown; captureDataUrl: string; brand: unknown; brief: unknown; svg?: string;
 }): ProductIR {
   const response = NodesResponse.parse(input.nodesResponse);
   const frame = selectedFrame(response, input.reference.nodeId);
@@ -111,7 +114,9 @@ export function figmaToProduct(input: {
     source: { kind: "figma", ...input.reference, version: response.version },
     product: { name: brief.productName, description: brief.description, category: brief.category },
     brand,
-    screens: [{ id: frame.id, name: frame.name, url: input.reference.url, captureUrl: input.captureDataUrl, width: box.width, height: box.height, regions }],
+    screens: [{ id: frame.id, name: frame.name, url: input.reference.url, captureUrl: input.captureDataUrl, width: box.width, height: box.height, regions,
+      ...(input.svg ? { layerScene: reconstructLayers(input.svg, frame) } : {}),
+    }],
     copy: { headline: brief.headline, subtext: brief.subtext, cta: brief.cta },
   });
 }
@@ -142,7 +147,8 @@ export class FigmaApiError extends Error {
 
 /** PNG bytes are embedded in the resulting plan, so expiring provider URLs cannot break a render. */
 export async function importFigma(input: {
-  url: string; token: string; brand: unknown; brief: unknown; fetch?: typeof fetch;
+  url: string; token: string; brand: unknown; brief: unknown; fetch?: typeof fetch; layers?: boolean;
+  onSnapshot?: (snapshot: { nodesResponse: unknown; captureDataUrl: string; svg?: string }) => void;
 }): Promise<ProductIR> {
   const reference = parseFigmaUrl(input.url);
   if (!input.token.trim()) throw new Error("Set FIGMA_ACCESS_TOKEN before importing a live Figma frame");
@@ -179,7 +185,17 @@ export async function importFigma(input: {
   const imageUrl = exported.images[reference.nodeId];
   if (!imageUrl) throw new Error("Figma could not export the selected frame");
   const captureDataUrl = await downloadPng(imageUrl, request);
-  return figmaToProduct({ reference, nodesResponse: nodes, captureDataUrl, brand, brief });
+  let svg: string | undefined;
+  if (input.layers) {
+    const svgQuery = new URLSearchParams({ ids: reference.nodeId, format: "svg", svg_outline_text: "true", svg_include_node_id: "true", svg_include_id: "true", use_absolute_bounds: "true" });
+    if (nodes.version) svgQuery.set("version", nodes.version);
+    const exportedSvg = z.object({ images: z.record(z.string(), z.string().nullable()) }).parse(await api(`images/${reference.fileKey}?${svgQuery}`));
+    const svgUrl = exportedSvg.images[reference.nodeId];
+    if (!svgUrl) throw new Error("Figma could not export the selected frame as SVG");
+    svg = await downloadSvg(svgUrl, request);
+  }
+  input.onSnapshot?.({ nodesResponse: nodes, captureDataUrl, svg });
+  return figmaToProduct({ reference, nodesResponse: nodes, captureDataUrl, brand, brief, svg });
 }
 
 /** No API authorization is ever forwarded to the asset host. */

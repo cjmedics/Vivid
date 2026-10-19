@@ -7,8 +7,8 @@ import { AnthropicPlanner, OpenAIPlanner, estimateProduction, figmaToProduct, im
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const args = process.argv.slice(2);
-const flags = new Set(["--render", "--help", "--accept-copy"]);
-const valueFlags = new Set(["--figma", "--figma-json", "--capture", "--brand", "--brief", "--pacing", "--logo", "--font", "--out", "--plan", "--screenshot", "--regions", "--planner", "--planner-model", "--copy-provider", "--copy-model", "--planner-replay", "--direction", "--planner-max-output"]);
+const flags = new Set(["--render", "--help", "--accept-copy", "--layers"]);
+const valueFlags = new Set(["--figma", "--figma-json", "--figma-svg", "--capture", "--brand", "--brief", "--pacing", "--logo", "--font", "--out", "--plan", "--screenshot", "--regions", "--planner", "--planner-model", "--copy-provider", "--copy-model", "--planner-replay", "--direction", "--planner-max-output"]);
 const options = new Map<string, string>();
 
 async function main(): Promise<void> {
@@ -21,6 +21,7 @@ async function main(): Promise<void> {
   if (options.has("--help")) {
     console.log("npm run create -- --figma <frame-link> --brand <kit.json> --brief <brief.json> [--render]\n" +
       "Offline export: also pass --figma-json <nodes-response.json> --capture <frame.png>\n" +
+      "Layer reconstruction: --layers for live import; offline also requires --figma-svg <outlined-node-tagged.svg>\n" +
       "Screenshot fallback: use --screenshot <frame.png> --regions <regions.json> instead of --figma\n" +
       "Optional: --pacing <profile.json> --logo <logo.png> --font <font.woff2> --plan pro --out <new-directory>\n" +
       "AI planning: --planner openai|anthropic --planner-model <id> [--copy-provider openai|anthropic] [--copy-model <id>]\n" +
@@ -45,6 +46,9 @@ async function main(): Promise<void> {
   if (options.has("--screenshot") === options.has("--figma")) throw new Error("Choose exactly one input: --figma or --screenshot");
   if (options.has("--figma-json") !== options.has("--capture")) throw new Error("Offline import requires both --figma-json and --capture");
   if (options.has("--screenshot") && (options.has("--figma-json") || options.has("--capture"))) throw new Error("Screenshot mode cannot include Figma snapshot options");
+  if (options.has("--layers") && options.has("--screenshot")) throw new Error("Layer reconstruction requires structured Figma content, not a screenshot");
+  if (options.has("--figma-svg") && (!options.has("--figma-json") || !options.has("--layers"))) throw new Error("--figma-svg requires --layers and --figma-json");
+  if (options.has("--layers") && options.has("--figma-json") && !options.has("--figma-svg")) throw new Error("Offline layers require --figma-svg");
   const out = resolve(options.get("--out") ?? `out/design-${Date.now()}`);
   if (existsSync(out)) throw new Error(`Output directory already exists: ${out}. Choose a new --out directory.`);
   const mode = options.get("--planner") ?? "rules";
@@ -90,12 +94,21 @@ async function main(): Promise<void> {
     inputMode = "annotated-screenshot";
   } else if (options.has("--figma-json")) {
     const capture = readPng(required("--capture"));
-    ir = figmaToProduct({ reference: parseFigmaUrl(required("--figma")), nodesResponse: readJson(required("--figma-json")), captureDataUrl: capture.url, brand, brief });
+    ir = figmaToProduct({ reference: parseFigmaUrl(required("--figma")), nodesResponse: readJson(required("--figma-json")), captureDataUrl: capture.url, brand, brief,
+      svg: options.has("--layers") ? readFileSync(resolve(required("--figma-svg")), "utf8") : undefined,
+    });
     const screen = ir.screens[0]!;
     if (Math.abs(capture.width / capture.height - screen.width! / screen.height!) > 0.01) throw new Error("Capture aspect ratio does not match the selected Figma frame; export with use_absolute_bounds=true");
     inputMode = "offline-figma-snapshot";
   } else {
-    ir = await importFigma({ url: required("--figma"), token: process.env.FIGMA_ACCESS_TOKEN ?? "", brand, brief });
+    ir = await importFigma({ url: required("--figma"), token: process.env.FIGMA_ACCESS_TOKEN ?? "", brand, brief, layers: options.has("--layers"),
+      onSnapshot: ({ nodesResponse, captureDataUrl, svg }) => {
+        mkdirSync(out, { recursive: true });
+        writeFileSync(resolve(out, "source.nodes.json"), JSON.stringify(nodesResponse));
+        writeFileSync(resolve(out, "source.capture.png"), Buffer.from(captureDataUrl.slice("data:image/png;base64,".length), "base64"));
+        if (svg) writeFileSync(resolve(out, "source.layers.svg"), svg);
+      },
+    });
     inputMode = "live-figma";
   }
   const planned = await planDesign(ir, {
@@ -108,6 +121,11 @@ async function main(): Promise<void> {
   mkdirSync(out, { recursive: true });
   const write = (name: string, value: unknown) => writeFileSync(resolve(out, name), JSON.stringify(value, null, 2) + "\n");
   write("product-ir.json", ir);
+  if (ir.screens[0]?.layerScene) write("layer-report.json", {
+    mode: "figma-svg-layers", outlineText: true, animatedLayerCount: ir.screens[0].layerScene.layers.length,
+    layers: ir.screens[0].layerScene.layers.map(({ nodeId, kind }) => ({ nodeId, kind })),
+    limit: "Up to 120 disjoint content nodes animate; other vector content retains its original appearance. SVG effects remain as exported, and text outlines are not editable text.",
+  });
   write("render-props.json", props);
   write("estimate.json", { ...estimate, planningCost: {
     basis: "configured-placeholder", confirmed: false,
