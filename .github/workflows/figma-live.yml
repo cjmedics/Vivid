@@ -17,6 +17,8 @@ jobs:
   live-import:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      VIVID_OUTPUT_ROOT: ${{ runner.temp }}/vivid-production
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,4 +35,19 @@ jobs:
           FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
           FIGMA_FRAME_URL: ${{ inputs.frame_url || vars.FIGMA_FRAME_URL || 'https://www.figma.com/design/gg58zkz3HwncQsCenBlSII/Untitled?node-id=2-197' }}
         run: node scripts/validate-figma-live.mjs
-      # No artifact upload: design data and video are deleted after verification.
+      - name: Preserve production files in an encrypted archive
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "$VIVID_OUTPUT_ROOT" ]; then
+            mkdir -p out
+            set -o pipefail
+            tar -cz -C "$VIVID_OUTPUT_ROOT" . | openssl cms -encrypt -binary -aes-256-gcm -outform DER -out out/figma-production.cms .github/figma-delivery-cert.pem
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vivid-figma-production-encrypted
+          path: out/figma-production.cms
+          if-no-files-found: error
+          retention-days: 90

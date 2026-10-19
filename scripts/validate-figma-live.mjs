@@ -1,5 +1,4 @@
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -14,9 +13,15 @@ try {
   if (frame.protocol !== "https:" || !["figma.com", "www.figma.com"].includes(frame.hostname) || !/^\/(design|file)\/[^/]+/.test(frame.pathname) || !frame.searchParams.get("node-id")) {
     throw new Error("Set FIGMA_FRAME_URL to a Figma frame link with node-id.");
   }
-  temporary = mkdtempSync(resolve(tmpdir(), "vivid-live-"));
+  if (process.env.VIVID_OUTPUT_ROOT) {
+    temporary = resolve(process.env.VIVID_OUTPUT_ROOT);
+    mkdirSync(temporary); // Refuse to overwrite a prior production.
+  } else {
+    mkdirSync(resolve(root, "out"), { recursive: true });
+    temporary = mkdtempSync(resolve(root, "out/figma-live-"));
+  }
   const briefPath = resolve(temporary, "brief.json");
-  writeFileSync(briefPath, JSON.stringify({ productName: "Import validation", description: "Validation of an authorized Figma frame.", category: "Design", headline: "Your design in motion", subtext: "Live import validation", cta: "Explore the design" }));
+  writeFileSync(briefPath, JSON.stringify({ productName: "Your design", description: "A motion showcase of the supplied Figma frame.", category: "Design", headline: "Your design in motion", subtext: "Every detail in focus.", cta: "Explore the design" }));
   const output = resolve(temporary, "production");
   const created = spawnSync(process.execPath, ["--import", "tsx", "apps/create/src/main.ts", "--figma", frame.href, "--brand", "fixtures/design.brand.json", "--brief", briefPath, "--planner", "rules", "--out", output, "--render"], {
     cwd: root, env: { ...process.env, FIGMA_ACCESS_TOKEN: token }, encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 15 * 60 * 1000, maxBuffer: 1024 * 1024,
@@ -38,12 +43,10 @@ try {
   if (verified.error || verified.status !== 0) throw new Error("MP4 metadata or full-frame decode verification failed.");
   const probe = JSON.parse(readFileSync(resolve(output, "probe.json"), "utf8"));
   const stream = probe.streams[0];
-  // Only numeric media metadata is logged. All design assets remain temporary.
+  // Only numeric media metadata is logged. Keep all generated production files.
   console.log(`Live Figma import and H.264 render passed: ${Number(stream.width)}x${Number(stream.height)}, ${Number(stream.nb_read_frames)} frames, ${Number(probe.format.duration)} seconds. Full decode passed.`);
 } catch (error) {
   // URL parsing can include user input in its error; do not forward that exception.
   console.error(error?.code === "ERR_INVALID_URL" ? "Set FIGMA_FRAME_URL to a valid Figma frame link." : error.message);
   process.exitCode = 1;
-} finally {
-  if (temporary) rmSync(temporary, { recursive: true, force: true });
 }
