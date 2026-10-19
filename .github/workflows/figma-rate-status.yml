@@ -1,0 +1,37 @@
+name: Check Figma rate-limit reset
+on:
+  push:
+    branches: ['diagnose/figma-rate-*']
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Read export rate-limit headers once
+        env:
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          const token = process.env.FIGMA_ACCESS_TOKEN?.trim();
+          if (!token) throw new Error("FIGMA_ACCESS_TOKEN is missing");
+          const response = await fetch("https://api.figma.com/v1/images/gg58zkz3HwncQsCenBlSII?ids=2%3A197&format=png&scale=2&use_absolute_bounds=true", {
+            headers: {"X-Figma-Token": token}, redirect: "error", signal: AbortSignal.timeout(30000),
+          });
+          const rawRetry = response.headers.get("retry-after") ?? "";
+          const retryAfterSec = /^\d+$/.test(rawRetry) && Number.isSafeInteger(Number(rawRetry)) ? Number(rawRetry) : null;
+          const serverDate = Date.parse(response.headers.get("date") ?? "");
+          const retryAtUtc = retryAfterSec !== null && Number.isFinite(serverDate) && retryAfterSec < 315360000 ? new Date(serverDate + retryAfterSec * 1000).toISOString() : null;
+          const planRaw = response.headers.get("x-figma-plan-tier");
+          const typeRaw = response.headers.get("x-figma-rate-limit-type");
+          console.log("FIGMA_RATE_STATUS " + JSON.stringify({
+            status: response.status, checkedAtUtc: new Date().toISOString(), retryAfterSec, retryAtUtc,
+            plan: ["starter","pro","org","enterprise","student"].includes(planRaw) ? planRaw : null,
+            limitType: ["low","high"].includes(typeRaw) ? typeRaw : null,
+          }));
+          await response.body?.cancel();
+          NODE
