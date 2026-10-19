@@ -1,0 +1,56 @@
+name: Verify foundation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npx remotion versions
+      - name: Install media verification tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Render sample MP4 with mock providers
+        run: npm run render:demo
+      - name: Verify MP4 metadata and decode every frame
+        run: |
+          ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=codec_name,width,height,r_frame_rate,nb_read_frames:format=duration -of json out/demo.mp4 > out/probe.json
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const props = JSON.parse(readFileSync('fixtures/render-props.generated.json', 'utf8'));
+          const probe = JSON.parse(readFileSync('out/probe.json', 'utf8'));
+          const stream = probe.streams[0];
+          const frames = props.plan.shots.reduce((sum, shot) => sum + Math.round(shot.durationSec * props.plan.fps), 0);
+          assert.equal(stream.codec_name, 'h264');
+          assert.equal(stream.width, props.width);
+          assert.equal(stream.height, props.height);
+          assert.equal(Number(stream.nb_read_frames), frames);
+          const [num, den] = stream.r_frame_rate.split('/').map(Number);
+          assert.equal(num / den, props.plan.fps);
+          assert.ok(Math.abs(Number(probe.format.duration) - frames / props.plan.fps) < 1 / props.plan.fps);
+          console.log(`Verified ${stream.width}x${stream.height}, ${frames} frames, ${probe.format.duration}s`);
+          NODE
+          ffmpeg -v error -xerror -i out/demo.mp4 -f null -
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vivid-demo
+          path: |
+            out/demo.mp4
+            out/probe.json
+          if-no-files-found: error
+          retention-days: 14
