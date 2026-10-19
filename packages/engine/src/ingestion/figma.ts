@@ -132,10 +132,11 @@ function classify(node: FigmaNode): RegionKind | undefined {
 }
 
 export class FigmaApiError extends Error {
-  constructor(readonly status: number, readonly retryAfter: string | null) {
+  constructor(readonly status: number, readonly retryAfter: string | null, readonly reason: "invalid-token" | "expired-token" | "scope" | "file-access" | "unspecified" = "unspecified", readonly stage: "nodes" | "export" = "nodes") {
     super(status === 429 ? `Figma rate limit reached. Retry after ${retryAfter ?? "the provider reset"}.` :
       status === 401 || status === 403 ? "Figma access denied. Check FIGMA_ACCESS_TOKEN and file_content:read access to this file." :
       status === 404 ? "Figma file or frame was not found." : `Figma request failed (HTTP ${status})`);
+    this.message += ` Figma diagnostic: HTTP ${status}; stage=${stage}; reason=${reason}.`;
   }
 }
 
@@ -153,7 +154,19 @@ export async function importFigma(input: {
     const res = await request(`https://api.figma.com/v1/${path}`, {
       headers: { "X-Figma-Token": input.token }, signal: AbortSignal.timeout(30_000), redirect: "error",
     });
-    if (!res.ok) throw new FigmaApiError(res.status, res.headers.get("retry-after"));
+    if (!res.ok) {
+      // Classify the provider's error without storing or exposing its raw response.
+      let reason: FigmaApiError["reason"] = "unspecified";
+      try {
+        const body = await res.json() as { err?: unknown; message?: unknown };
+        const detail = [body.err, body.message].filter((v): v is string => typeof v === "string").join(" ").slice(0, 4096).toLowerCase();
+        if (/scope/.test(detail)) reason = "scope";
+        else if (/expired/.test(detail)) reason = "expired-token";
+        else if (/invalid.*token|token.*invalid/.test(detail)) reason = "invalid-token";
+        else if (/permission|access denied|not authorized|forbidden/.test(detail)) reason = "file-access";
+      } catch { /* Non-JSON errors retain an unspecified reason. */ }
+      throw new FigmaApiError(res.status, res.headers.get("retry-after"), reason, path.startsWith("images/") ? "export" : "nodes");
+    }
     return res.json();
   }
   const query = new URLSearchParams({ ids: reference.nodeId });
