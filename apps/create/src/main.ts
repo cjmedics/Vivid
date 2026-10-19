@@ -3,12 +3,12 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { BrandKit, PLANS, ProductIR, Region, VideoBrief, frameSize, type PlanId } from "@vivid/core";
-import { AnthropicPlanner, OpenAIPlanner, estimateProduction, figmaToProduct, importFigma, ModelTelemetry, parseFigmaUrl, planDesign, type PlanningProvider } from "@vivid/engine";
+import { AnthropicPlanner, OpenAIPlanner, estimateProduction, figmaToProduct, importFigma, ModelTelemetry, parseFigmaUrl, planDesign, reopenProject, type PlanningProvider } from "@vivid/engine";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const args = process.argv.slice(2);
 const flags = new Set(["--render", "--help", "--accept-copy", "--layers"]);
-const valueFlags = new Set(["--figma", "--figma-json", "--figma-svg", "--capture", "--brand", "--brief", "--pacing", "--logo", "--font", "--out", "--plan", "--screenshot", "--regions", "--planner", "--planner-model", "--copy-provider", "--copy-model", "--planner-replay", "--direction", "--planner-max-output"]);
+const valueFlags = new Set(["--project", "--figma", "--figma-json", "--figma-svg", "--capture", "--brand", "--brief", "--pacing", "--logo", "--font", "--out", "--plan", "--screenshot", "--regions", "--planner", "--planner-model", "--copy-provider", "--copy-model", "--planner-replay", "--direction", "--planner-max-output"]);
 const options = new Map<string, string>();
 
 async function main(): Promise<void> {
@@ -20,6 +20,7 @@ async function main(): Promise<void> {
   }
   if (options.has("--help")) {
     console.log("npm run create -- --figma <frame-link> --brand <kit.json> --brief <brief.json> [--render]\n" +
+      "Saved project: --project <production-directory-or-product-ir.json> [--pacing <profile.json>] [--render]\n" +
       "Offline export: also pass --figma-json <nodes-response.json> --capture <frame.png>\n" +
       "Layer reconstruction: --layers for live import; offline also requires --figma-svg <outlined-node-tagged.svg>\n" +
       "Screenshot fallback: use --screenshot <frame.png> --regions <regions.json> instead of --figma\n" +
@@ -30,7 +31,14 @@ async function main(): Promise<void> {
   }
   const required = (name: string) => { const v = options.get(name); if (!v) throw new Error(`Missing ${name}; run npm run create -- --help`); return v; };
   const readJson = (path: string) => JSON.parse(readFileSync(resolve(path), "utf8"));
-  const brand = BrandKit.parse(readJson(required("--brand")));
+  const inputs = ["--project", "--figma", "--screenshot"].filter((name) => options.has(name));
+  if (inputs.length !== 1) throw new Error("Choose exactly one input: --project, --figma, or --screenshot");
+  if (options.has("--project") && ["--figma-json", "--figma-svg", "--capture", "--regions", "--layers"].some((name) => options.has(name))) {
+    throw new Error("Saved projects already contain their design assets; do not combine --project with import flags");
+  }
+  const projectPath = options.has("--project") ? resolve(required("--project")) : undefined;
+  const saved = projectPath ? ProductIR.parse(readJson(statSync(projectPath).isDirectory() ? resolve(projectPath, "product-ir.json") : projectPath)) : undefined;
+  const brand = BrandKit.parse(options.has("--brand") ? readJson(required("--brand")) : saved?.brand ?? readJson(required("--brand")));
   if (options.has("--logo")) brand.logoUrl = readPng(required("--logo")).url;
   if (options.has("--font")) {
     const bytes = readFileSync(resolve(required("--font")));
@@ -39,11 +47,13 @@ async function main(): Promise<void> {
   }
   if (brand.logoUrl && !brand.logoUrl.startsWith("data:image/png;base64,")) throw new Error("Use --logo <local.png> for a durable brand logo");
   if (brand.fontUrl && !brand.fontUrl.startsWith("data:font/woff2;base64,")) throw new Error("Use --font <local.woff2> for a durable brand font");
-  const brief = VideoBrief.parse(readJson(required("--brief")));
+  const brief = VideoBrief.parse(options.has("--brief") ? readJson(required("--brief")) : saved ? {
+    productName: saved.product.name, description: saved.product.description, category: saved.product.category,
+    headline: saved.copy.headline, subtext: saved.copy.subtext, cta: saved.copy.cta,
+  } : readJson(required("--brief")));
   const planId = options.get("--plan") ?? "pro";
   if (!Object.hasOwn(PLANS, planId)) throw new Error(`Unknown account plan: ${planId}`);
   const account = PLANS[planId as PlanId];
-  if (options.has("--screenshot") === options.has("--figma")) throw new Error("Choose exactly one input: --figma or --screenshot");
   if (options.has("--figma-json") !== options.has("--capture")) throw new Error("Offline import requires both --figma-json and --capture");
   if (options.has("--screenshot") && (options.has("--figma-json") || options.has("--capture"))) throw new Error("Screenshot mode cannot include Figma snapshot options");
   if (options.has("--layers") && options.has("--screenshot")) throw new Error("Layer reconstruction requires structured Figma content, not a screenshot");
@@ -81,7 +91,10 @@ async function main(): Promise<void> {
 
   let ir: ProductIR;
   let inputMode: string;
-  if (options.has("--screenshot")) {
+  if (saved) {
+    ir = reopenProject(saved, { brand, brief });
+    inputMode = "saved-project";
+  } else if (options.has("--screenshot")) {
     const capture = readPng(required("--screenshot"));
     const rawRegions = readJson(required("--regions"));
     if (!Array.isArray(rawRegions) || !rawRegions.length) throw new Error("Screenshot fallback needs a nonempty array of normalized region annotations");

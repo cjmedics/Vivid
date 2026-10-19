@@ -158,3 +158,39 @@ This first layer milestone is deterministic scene reconstruction, not text reflo
 word/character animation inside outlined text, interaction inference, or AI art direction.
 Source geometry and supported SVG effects remain authoritative; choreography is
 heuristic. More complex unsupported SVG exports require importer extensions.
+
+
+## Reopen a saved project without Figma
+
+Every completed import writes a portable `product-ir.json` containing its captures,
+optional reconstructed SVG scene, embedded images, brand assets, source provenance,
+and original copy. Use that file or its containing production directory as `--project`:
+
+```bash
+npm run create -- --project out/my-first-design \
+  --pacing fixtures/pacing.brisk.json --out out/my-next-version --render
+```
+
+No Figma token or API request is needed. Brand and copy default to the saved project;
+optional `--brand`, `--brief`, `--logo`, and `--font` explicitly override them for the
+new version. The source file and all prior productions stay unchanged. A fresh output
+directory is required. Layer scenes are retained automatically: do not pass `--layers`
+or other import flags when reopening a project.
+
+Reopening accepts a ProductIR file, not `production.json` or `render-props.json`.
+External frame captures, logos and fonts are rejected rather than downloaded; the
+saved project must embed its PNG captures and optional PNG logo/WOFF2 font. Provenance
+links are retained as metadata and are not fetched. Runtime dependencies and the
+Remotion browser must already be installed before a completely offline render.
+
+Planning defaults to deterministic rules and does not call a model. Explicit
+`--planner openai|anthropic` still enables paid model requests; saved-project input
+does not silently enable them. Saved planning suggestions can instead be replayed
+with `--planner-replay`. New timing applies to a new plan, and the estimate is
+recalculated. Local runs do not charge account usage.
+
+The new production records `inputMode: "saved-project"` and writes its own IR,
+planning audit, estimate, layer report (if applicable), render props and optional MP4.
+This is a CLI reopening workflow, not cloud project storage, automatic Figma sync,
+or a way to decrypt previously encrypted backups. The operator must have access
+to the saved project's actual files.
