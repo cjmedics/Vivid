@@ -9,6 +9,7 @@
   "scripts": {
     "create": "node --env-file-if-exists=.env --import tsx apps/create/src/main.ts",
     "create:sample": "npm run create -- --figma https://www.figma.com/design/VividFixture/Launchboard?node-id=1-2 --figma-json fixtures/design.nodes.json --capture fixtures/design.capture.png --brand fixtures/design.brand.json --brief fixtures/design.brief.json --out out/design-sample",
+    "create:planned-sample": "npm run create:sample -- --planner-replay fixtures/planner.suggestions.json --accept-copy --out out/planned-sample",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "demo": "tsx apps/demo/src/main.ts",

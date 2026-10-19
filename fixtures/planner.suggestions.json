@@ -1,0 +1,16 @@
+{
+  "choreography": {
+    "screenId": "1:2",
+    "focusRegionIds": ["3:3", "3:1", "3:2"],
+    "typography": "typography/word-reveal",
+    "transition": "transitions/slide",
+    "pacing": { "introSec": 3, "overviewSec": 4, "focusSec": 3, "outroSec": 3, "transitionSec": 0.5 },
+    "note": "Fixture replay: reveal the launch card first, then the planning and team cards. This example is hand-authored, not a live model response."
+  },
+  "copy": {
+    "headline": "Your next launch, brought into focus.",
+    "subtext": "A shared workspace for the work ahead.",
+    "cta": "Explore Launchboard",
+    "evidenceIds": ["brief:description", "copy:headline", "copy:subtext"]
+  }
+}

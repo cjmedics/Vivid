@@ -3,12 +3,12 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { BrandKit, PLANS, ProductIR, Region, VideoBrief, frameSize, type PlanId } from "@vivid/core";
-import { buildDesignReveal, estimateProduction, figmaToProduct, importFigma, ModelTelemetry, parseFigmaUrl } from "@vivid/engine";
+import { AnthropicPlanner, OpenAIPlanner, estimateProduction, figmaToProduct, importFigma, ModelTelemetry, parseFigmaUrl, planDesign, type PlanningProvider } from "@vivid/engine";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const args = process.argv.slice(2);
-const flags = new Set(["--render", "--help"]);
-const valueFlags = new Set(["--figma", "--figma-json", "--capture", "--brand", "--brief", "--pacing", "--logo", "--font", "--out", "--plan", "--screenshot", "--regions"]);
+const flags = new Set(["--render", "--help", "--accept-copy"]);
+const valueFlags = new Set(["--figma", "--figma-json", "--capture", "--brand", "--brief", "--pacing", "--logo", "--font", "--out", "--plan", "--screenshot", "--regions", "--planner", "--planner-model", "--copy-provider", "--copy-model", "--planner-replay", "--direction", "--planner-max-output"]);
 const options = new Map<string, string>();
 
 async function main(): Promise<void> {
@@ -22,7 +22,9 @@ async function main(): Promise<void> {
     console.log("npm run create -- --figma <frame-link> --brand <kit.json> --brief <brief.json> [--render]\n" +
       "Offline export: also pass --figma-json <nodes-response.json> --capture <frame.png>\n" +
       "Screenshot fallback: use --screenshot <frame.png> --regions <regions.json> instead of --figma\n" +
-      "Optional: --pacing <profile.json> --logo <logo.png> --font <font.woff2> --plan pro --out <new-directory>");
+      "Optional: --pacing <profile.json> --logo <logo.png> --font <font.woff2> --plan pro --out <new-directory>\n" +
+      "AI planning: --planner openai|anthropic --planner-model <id> [--copy-provider openai|anthropic] [--copy-model <id>]\n" +
+      "Review: --planner-replay <suggestions.json> [--accept-copy]. --direction <text> supplies creative direction.");
     return;
   }
   const required = (name: string) => { const v = options.get(name); if (!v) throw new Error(`Missing ${name}; run npm run create -- --help`); return v; };
@@ -45,6 +47,33 @@ async function main(): Promise<void> {
   if (options.has("--screenshot") && (options.has("--figma-json") || options.has("--capture"))) throw new Error("Screenshot mode cannot include Figma snapshot options");
   const out = resolve(options.get("--out") ?? `out/design-${Date.now()}`);
   if (existsSync(out)) throw new Error(`Output directory already exists: ${out}. Choose a new --out directory.`);
+  const mode = options.get("--planner") ?? "rules";
+  if (!["rules", "openai", "anthropic"].includes(mode)) throw new Error("Planner must be rules, openai, or anthropic");
+  if ((options.get("--direction")?.length ?? 0) > 500) throw new Error("Direction must be 500 characters or shorter");
+  let choreography: PlanningProvider | undefined;
+  let copy: PlanningProvider | undefined;
+  let replay: { choreography: unknown; copy?: unknown } | undefined;
+  if (options.has("--accept-copy") && !options.has("--planner-replay")) throw new Error("Review saved suggestions first; --accept-copy requires --planner-replay");
+  if (options.has("--planner-replay")) {
+    if (mode !== "rules" || ["--planner-model", "--copy-provider", "--copy-model", "--planner-max-output"].some((flag) => options.has(flag))) throw new Error("Choose replay or live planning options, not both");
+    const value = readJson(required("--planner-replay"));
+    if (!value || typeof value !== "object" || !Object.hasOwn(value, "choreography") || Object.keys(value).some((k) => !["choreography", "copy"].includes(k))) throw new Error("Replay file must contain choreography and optional copy only");
+    replay = value;
+  } else if (mode !== "rules") {
+    const make = (provider: string, model: string | undefined) => {
+      const maxOutputTokens = Number(options.get("--planner-max-output") ?? 2048);
+      if (provider === "openai") return new OpenAIPlanner({ apiKey: process.env.OPENAI_API_KEY ?? "", model: model ?? process.env.OPENAI_PLANNER_MODEL ?? "gpt-5.5", maxOutputTokens });
+      if (provider === "anthropic") return new AnthropicPlanner({ apiKey: process.env.ANTHROPIC_API_KEY ?? "", model: model ?? process.env.ANTHROPIC_PLANNER_MODEL ?? "claude-sonnet-5", maxOutputTokens });
+      throw new Error("Copy provider must be openai or anthropic");
+    };
+    choreography = make(mode, options.get("--planner-model"));
+    const copyProvider = options.get("--copy-provider") ?? mode;
+    const copyModel = options.get("--copy-model") ?? (copyProvider === "anthropic" ? process.env.ANTHROPIC_COPY_MODEL ?? "claude-haiku-4-5" : process.env.OPENAI_COPY_MODEL ?? (copyProvider === mode ? choreography.model : "gpt-5.5"));
+    copy = make(copyProvider, copyModel);
+    console.log(`Live planning enabled: choreography ${choreography.id}/${choreography.model}; copy ${copy.id}/${copy.model}. Up to two paid requests; actual planning spend is not yet priced into the estimate.`);
+  } else if (["--planner-model", "--copy-provider", "--copy-model", "--planner-max-output", "--accept-copy"].some((flag) => options.has(flag))) {
+    throw new Error("Copy/model options require live planning or --planner-replay");
+  }
 
   let ir: ProductIR;
   let inputMode: string;
@@ -69,18 +98,30 @@ async function main(): Promise<void> {
     ir = await importFigma({ url: required("--figma"), token: process.env.FIGMA_ACCESS_TOKEN ?? "", brand, brief });
     inputMode = "live-figma";
   }
-  const plan = buildDesignReveal(ir, { pacing: options.has("--pacing") ? readJson(required("--pacing")) : undefined });
+  const planned = await planDesign(ir, {
+    choreography, copy, replay, acceptCopy: options.has("--accept-copy"), direction: options.get("--direction"),
+    pacing: options.has("--pacing") ? readJson(required("--pacing")) : undefined,
+  });
+  const { plan } = planned;
   const estimate = estimateProduction({ plan, account, route: { catalog: [], telemetry: new ModelTelemetry(), availableProviders: new Set() } });
   const props = { plan, ...frameSize(estimate.resolution, plan.aspectRatio), assets: Object.fromEntries(plan.shots.map((s) => [s.id, { kind: "deterministic" }])) };
   mkdirSync(out, { recursive: true });
   const write = (name: string, value: unknown) => writeFileSync(resolve(out, name), JSON.stringify(value, null, 2) + "\n");
   write("product-ir.json", ir);
   write("render-props.json", props);
-  write("estimate.json", estimate);
+  write("estimate.json", { ...estimate, planningCost: {
+    basis: "configured-placeholder", confirmed: false,
+    reconciliationRequired: planned.audit.spendStatus === "unpriced-provider-usage",
+    note: "The engine planning allowance is an assumption, not measured provider spend. See planning.json for token usage.",
+  } });
+  write("planning.json", planned.audit);
+  write("planner-suggestions.json", { choreography: planned.choreography ?? null, copy: planned.copySuggestion ?? null });
   const manifest = { status: "planned", inputMode, productionId: plan.id, output: null as string | null, usageCharged: false };
   write("production.json", manifest);
   console.log(`${brief.productName}: ${estimate.durationSec.toFixed(1)}s, ${estimate.resolution}, ${plan.shots.length} shots, ${estimate.buildMinutes.toFixed(1)} estimated Build Minutes. Local run: no usage charged.`);
   console.log(`Input: ${inputMode}. Plan and quote: ${out}`);
+  console.log(`Planning: ${planned.audit.mode}; choreography ${planned.audit.choreography.source}; copy ${planned.audit.copy.source}${planned.audit.copyAccepted ? " (accepted)" : " (original copy retained)"}.`);
+  if (planned.audit.copyReviewRequired) console.log("Review planner-suggestions.json. To use approved suggestions without another API call, rerun with --planner-replay <that-file> --accept-copy and a new --out directory.");
   if (!options.has("--render")) return;
   const output = resolve(out, "video.mp4");
   const cli = resolve(dirname(fileURLToPath(import.meta.resolve("@remotion/cli/package.json"))), "remotion-cli.js");

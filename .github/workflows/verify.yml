@@ -66,3 +66,13 @@ jobs:
           path: out/design-sample/
           if-no-files-found: error
           retention-days: 14
+      - name: Render reviewed planning replay without model credentials
+        run: npm run create:planned-sample -- --render
+      - name: Verify reviewed-plan MP4
+        run: node scripts/verify-video.mjs out/planned-sample/render-props.json out/planned-sample/video.mp4 out/planned-sample/probe.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vivid-planning-replay
+          path: out/planned-sample/
+          if-no-files-found: error
+          retention-days: 14
