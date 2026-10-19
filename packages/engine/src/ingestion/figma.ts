@@ -7,6 +7,7 @@ interface FigmaNode {
   type: string;
   visible?: boolean;
   opacity?: number;
+  clipsContent?: boolean;
   characters?: string;
   absoluteBoundingBox?: { x: number; y: number; width: number; height: number };
   style?: { fontFamily?: string; fontSize?: number };
@@ -16,7 +17,7 @@ interface FigmaNode {
 
 const Node: z.ZodType<FigmaNode> = z.lazy(() => z.object({
   id: z.string().min(1), name: z.string(), type: z.string(),
-  visible: z.boolean().optional(), opacity: z.number().optional(), characters: z.string().optional(),
+  visible: z.boolean().optional(), opacity: z.number().optional(), clipsContent: z.boolean().optional(), characters: z.string().optional(),
   absoluteBoundingBox: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).optional(),
   style: z.object({ fontFamily: z.string().optional(), fontSize: z.number().optional() }).optional(),
   fills: z.array(z.object({
@@ -70,14 +71,14 @@ export function figmaToProduct(input: {
   const brief = VideoBrief.parse(input.brief);
   const brand = BrandKit.parse(input.brand);
   const regions: Region[] = [];
-  function visit(node: FigmaNode): void {
+  function visit(node: FigmaNode, clip = box): void {
     if (node.visible === false || node.opacity === 0) return;
     const bounds = node.absoluteBoundingBox;
     if (bounds && bounds.width > 0 && bounds.height > 0) {
-      const left = Math.max(bounds.x, box!.x);
-      const top = Math.max(bounds.y, box!.y);
-      const right = Math.min(bounds.x + bounds.width, box!.x + box!.width);
-      const bottom = Math.min(bounds.y + bounds.height, box!.y + box!.height);
+      const left = Math.max(bounds.x, clip.x);
+      const top = Math.max(bounds.y, clip.y);
+      const right = Math.min(bounds.x + bounds.width, clip.x + clip.width);
+      const bottom = Math.min(bounds.y + bounds.height, clip.y + clip.height);
       if (right > left && bottom > top) {
         const kind = classify(node);
         if (kind) {
@@ -97,7 +98,12 @@ export function figmaToProduct(input: {
         }
       }
     }
-    for (const child of node.children ?? []) visit(child);
+    const childClip = node.clipsContent && bounds ? {
+      x: Math.max(bounds.x, clip.x), y: Math.max(bounds.y, clip.y),
+      width: Math.max(0, Math.min(bounds.x + bounds.width, clip.x + clip.width) - Math.max(bounds.x, clip.x)),
+      height: Math.max(0, Math.min(bounds.y + bounds.height, clip.y + clip.height) - Math.max(bounds.y, clip.y)),
+    } : clip;
+    for (const child of node.children ?? []) visit(child, childClip);
   }
   for (const child of frame.children ?? []) visit(child);
   if (!regions.length) throw new Error("Selected frame has no visible, bounded content to highlight");

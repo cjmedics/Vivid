@@ -49,6 +49,15 @@ describe("Figma design ingestion", () => {
     const wrongRatio = input(); wrongRatio.nodesResponse.nodes["1:2"].document.absoluteBoundingBox.width = 750;
     expect(() => figmaToProduct(wrongRatio)).toThrow("aspect ratio");
   });
+  it("does not highlight content hidden by a clipping ancestor", () => {
+    const v = input();
+    v.nodesResponse.nodes["1:2"].document.children.push({
+      id: "clipping", name: "Container", type: "FRAME", clipsContent: true,
+      absoluteBoundingBox: { x: 100, y: 200, width: 100, height: 100 },
+      children: [{ id: "clipped", name: "Card", type: "FRAME", absoluteBoundingBox: { x: 300, y: 400, width: 50, height: 50 } }],
+    });
+    expect(figmaToProduct(v).screens[0]!.regions.some((r) => r.id === "clipped")).toBe(false);
+  });
   it("validates explicit brand colors and input pacing", () => {
     expect(() => BrandKit.parse({ ...brand, primary: "blue" })).toThrow();
     expect(() => PacingProfile.parse({ focusSec: -2 })).toThrow();
