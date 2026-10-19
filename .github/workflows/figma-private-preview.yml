@@ -1,0 +1,71 @@
+name: Deliver private Vivid MP4 preview
+
+on:
+  push:
+    branches: ['deliver/figma-private-*']
+  workflow_dispatch:
+    inputs:
+      frame_url:
+        description: Authorized Figma frame link
+        required: true
+        default: 'https://www.figma.com/design/gg58zkz3HwncQsCenBlSII/Untitled?node-id=2-197'
+
+permissions:
+  contents: read
+
+jobs:
+  live-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      VIVID_OUTPUT_ROOT: /tmp/vivid-production
+      VIVID_LAYERED_RENDER: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install media verification tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Import authorized frame, render MP4, and decode every frame
+        env:
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+          FIGMA_FRAME_URL: ${{ inputs.frame_url || vars.FIGMA_FRAME_URL || 'https://www.figma.com/design/gg58zkz3HwncQsCenBlSII/Untitled?node-id=2-197' }}
+        run: node scripts/validate-figma-live.mjs
+      - name: Save MP4 as an unpublished draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_TAG: vivid-private-preview-${{ github.run_id }}
+        shell: bash
+        run: |
+          cp "$VIVID_OUTPUT_ROOT/production/video.mp4" "$VIVID_OUTPUT_ROOT/vivid-layer-motion.mp4"
+          cat > "$RUNNER_TEMP/preview-notes.txt" <<'NOTES'
+          Private Vivid motion preview: 20 source layers, 19 seconds, 1080p.
+          Download vivid-layer-motion.mp4 below to watch the result.
+          This release must remain a draft; publishing would make the video public.
+          NOTES
+          gh release create "$PREVIEW_TAG" "$VIVID_OUTPUT_ROOT/vivid-layer-motion.mp4" --draft --target main --title "Vivid layer motion — private MP4 preview" --notes-file "$RUNNER_TEMP/preview-notes.txt"
+          test "$(gh release view "$PREVIEW_TAG" --json isDraft --jq '.isDraft')" = true
+          gh release view "$PREVIEW_TAG" --json url --jq '.url'
+      - name: Preserve production files in an encrypted archive
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "$VIVID_OUTPUT_ROOT" ]; then
+            mkdir -p out
+            set -o pipefail
+            tar -cz -C "$VIVID_OUTPUT_ROOT" . | openssl cms -encrypt -binary -aes-256-gcm -outform DER -out out/figma-production.cms .github/figma-delivery-cert.pem
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vivid-figma-production-encrypted
+          path: out/figma-production.cms
+          if-no-files-found: error
+          retention-days: 90
