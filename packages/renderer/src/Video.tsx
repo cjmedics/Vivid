@@ -1,21 +1,32 @@
-import React from "react";
-import { AbsoluteFill, OffthreadVideo, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import React, { useEffect, useState } from "react";
+import { AbsoluteFill, Img, OffthreadVideo, Sequence, cancelRender, continueRender, delayRender, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { SyntheticScreen, mix, type ScreenOverrides } from "./SyntheticScreen";
 import { cameraFor, cameraTransform, find, progress, regionOf, tickValue } from "./primitives";
 import type { ShotAsset, Shot, ShotPlan, VividProps } from "./types";
 
 export const VividVideo: React.FC<VividProps> = ({ plan, assets }) => {
   const { fps } = useVideoConfig();
+  const [fontHandle] = useState(() => plan.brand.fontUrl ? delayRender("Loading brand font") : null);
+  useEffect(() => {
+    if (fontHandle === null || !plan.brand.fontUrl) return;
+    const font = new FontFace("VividBrand", `url(${plan.brand.fontUrl})`);
+    font.load().then((loaded) => {
+      // Some dependency DOM declarations omit FontFaceSet's standard add() method.
+      (document.fonts as FontFaceSet & { add(font: FontFace): FontFaceSet }).add(loaded);
+      continueRender(fontHandle);
+    }).catch(cancelRender);
+  }, [fontHandle, plan.brand.fontUrl]);
+  const renderedPlan = plan.brand.fontUrl ? { ...plan, brand: { ...plan.brand, fontFamily: "VividBrand" } } : plan;
   let from = 0;
   return (
-    <AbsoluteFill style={{ background: plan.brand.background, fontFamily: plan.brand.fontFamily }}>
+    <AbsoluteFill style={{ background: plan.brand.background, fontFamily: renderedPlan.brand.fontFamily }}>
       {plan.shots.map((shot) => {
         const frames = Math.round(shot.durationSec * fps);
         const start = from;
         from += frames;
         return (
           <Sequence key={shot.id} from={start} durationInFrames={frames} name={`${shot.id} · ${shot.beat}`}>
-            <ShotView shot={shot} plan={plan} asset={assets[shot.id] ?? { kind: "deterministic" }} />
+            <ShotView shot={shot} plan={renderedPlan} asset={assets[shot.id] ?? { kind: "deterministic" }} />
           </Sequence>
         );
       })}
@@ -25,7 +36,7 @@ export const VividVideo: React.FC<VividProps> = ({ plan, assets }) => {
 
 const ShotView: React.FC<{ shot: Shot; plan: ShotPlan; asset: ShotAsset }> = ({ shot, plan, asset }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
   const t = frame / fps;
   const { brand } = plan;
 
@@ -64,9 +75,14 @@ const ShotView: React.FC<{ shot: Shot; plan: ShotPlan; asset: ShotAsset }> = ({ 
   const headline = shot.primitives.find((p) => p.primitiveId.startsWith("typography/") && p.params.slot === "headline");
   const subtext = shot.primitives.find((p) => p.primitiveId.startsWith("typography/") && p.params.slot === "subtext");
   const cta = find(shot, "presentation/cta-card");
+  const highlight = find(shot, "presentation/region-highlight");
+  const highlightRegion = regionOf(screen, highlight?.targetRegionId);
+  const aspect = screen?.width && screen.height ? screen.width / screen.height : 16 / 10;
+  const screenWidth = Math.min(width * 0.84, height * (subtext ? 0.65 : 0.78) * aspect);
 
   return (
     <AbsoluteFill style={entryStyle}>
+      {plan.presetId === "design-reveal" && <AbsoluteFill style={{ background: `radial-gradient(ellipse at 15% 20%, ${brand.primary}33, transparent 55%), radial-gradient(ellipse at 90% 80%, ${brand.accent}22, transparent 50%)` }} />}
       {backdrop && <Backdrop asset={asset} brand={brand} generatedSec={shot.generation?.durationSec ?? shot.durationSec} cinematic={backdrop.primitiveId.endsWith("plate")} />}
 
       {screen && (
@@ -74,9 +90,8 @@ const ShotView: React.FC<{ shot: Shot; plan: ShotPlan; asset: ShotAsset }> = ({ 
           <div
             style={{
               position: "relative",
-              width: "84%",
-              aspectRatio: "16 / 10",
-              maxHeight: subtext ? "70%" : "86%",
+              width: screenWidth,
+              height: screenWidth / aspect,
               borderRadius: 22,
               overflow: "hidden",
               boxShadow: `0 40px 120px ${mix(brand.background, "#000000", 0.6)}`,
@@ -85,7 +100,16 @@ const ShotView: React.FC<{ shot: Shot; plan: ShotPlan; asset: ShotAsset }> = ({ 
             }}
           >
             <div style={{ position: "absolute", inset: 0, transform: cameraTransform(cameraFor(shot, screen, t)) }}>
-              <SyntheticScreen screen={screen} brand={brand} overrides={overrides} />
+              {screen.captureUrl
+                ? <Img src={screen.captureUrl} style={{ width: "100%", height: "100%", objectFit: "fill", display: "block" }} />
+                : <SyntheticScreen screen={screen} brand={brand} overrides={overrides} />}
+              {highlightRegion && highlight && <div style={{
+                position: "absolute", pointerEvents: "none",
+                left: `${highlightRegion.bbox.x * 100}%`, top: `${highlightRegion.bbox.y * 100}%`,
+                width: `${highlightRegion.bbox.w * 100}%`, height: `${highlightRegion.bbox.h * 100}%`,
+                border: `3px solid ${brand.accent}`, boxSizing: "border-box", borderRadius: 10,
+                boxShadow: `0 0 35px ${brand.accent}55`, opacity: progress(highlight, t),
+              }} />}
               {click && <Cursor region={regionOf(screen, click.targetRegionId)} k={clickK} />}
             </div>
           </div>
@@ -209,7 +233,9 @@ const CtaCard: React.FC<{ plan: ShotPlan; frame: number }> = ({ plan, frame }) =
     <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: s, transform: `scale(${0.92 + 0.08 * s})` }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 18, background: brand.primary }} />
+          {brand.logoUrl
+            ? <Img src={brand.logoUrl} style={{ width: 64, height: 64, objectFit: "contain" }} />
+            : <div style={{ width: 64, height: 64, borderRadius: 18, background: brand.primary }} />}
           <div style={{ fontSize: 72, fontWeight: 800, color: brand.foreground, letterSpacing: "-0.03em" }}>{plan.productName}</div>
         </div>
         <div style={{ fontSize: 34, color: brand.foreground, opacity: 0.75 }}>{plan.copy.headline}</div>

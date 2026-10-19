@@ -4,3 +4,5 @@ export * from "./plans.js";
 export * from "./ir.js";
 export * from "./motion.js";
 export * from "./shotplan.js";
+export * from "./inputs.js";
+export * from "./validate.js";

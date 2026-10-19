@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AspectRatio, QualityMode } from "./media.js";
-import { Brand } from "./ir.js";
+import { Brand, Screen, ProductIR } from "./ir.js";
+import { PacingProfile } from "./inputs.js";
 
 /**
  * ShotPlan — the single production spec. The renderer, router, estimator and ledger
@@ -79,9 +80,11 @@ export const ShotPlan = z.object({
   quality: QualityMode,
   fps: z.number().int().positive(),
   brand: Brand,
+  source: ProductIR.shape.source,
+  pacing: PacingProfile.optional(),
   copy: z.object({ headline: z.string(), subtext: z.string(), cta: z.string() }),
   /** Screens referenced by primitives, carried so the renderer is self-contained. */
-  screens: z.array(z.any()),
+  screens: z.array(Screen),
   shots: z.array(Shot).min(1),
 });
 export type ShotPlan = z.infer<typeof ShotPlan>;

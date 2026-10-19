@@ -54,3 +54,15 @@ jobs:
             out/probe.json
           if-no-files-found: error
           retention-days: 14
+      - name: Render imported design fixture without generation providers
+        run: npm run create:sample -- --render
+      - name: Verify imported-design MP4 and create visual review sheet
+        run: |
+          node scripts/verify-video.mjs out/design-sample/render-props.json out/design-sample/video.mp4 out/design-sample/probe.json
+          ffmpeg -v error -i out/design-sample/video.mp4 -vf "select='eq(n,30)+eq(n,150)+eq(n,240)+eq(n,330)+eq(n,420)+eq(n,540)',scale=480:-1,tile=3x2" -frames:v 1 out/design-sample/contact-sheet.jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vivid-design-reveal
+          path: out/design-sample/
+          if-no-files-found: error
+          retention-days: 14

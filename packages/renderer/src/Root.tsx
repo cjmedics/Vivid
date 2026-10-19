@@ -3,14 +3,18 @@ import { Composition, type CalculateMetadataFunction } from "remotion";
 import { VividVideo } from "./Video";
 import type { VividProps } from "./types";
 import sample from "../../../fixtures/render-props.sample.json";
+import { validateShotPlan } from "@vivid/core";
 
 /** Length and size come from the ShotPlan, so the composition never drifts from the estimate. */
-const calculateMetadata: CalculateMetadataFunction<VividProps> = ({ props }) => ({
+const calculateMetadata: CalculateMetadataFunction<VividProps> = ({ props }) => {
+  validateShotPlan(props.plan);
+  return ({
   fps: props.plan.fps,
   width: props.width,
   height: props.height,
   durationInFrames: props.plan.shots.reduce((n, s) => n + Math.round(s.durationSec * props.plan.fps), 0),
-});
+  });
+};
 
 export const Root: React.FC = () => (
   <Composition

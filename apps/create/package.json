@@ -1,0 +1,7 @@
+{
+  "name": "@vivid/create",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@vivid/core": "*", "@vivid/engine": "*" }
+}

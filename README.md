@@ -11,6 +11,7 @@ npm run demo -- --style cinematic --plan studio
 npm run demo -- --outage # OpenRouter down → router falls back to Higgsfield
 npm run render:demo      # writes out/demo.mp4 via Remotion
 npm run studio           # Remotion Studio
+npm run create:sample -- --render  # offline Figma-shaped fixture → real image → MP4
 ```
 
 ## Layout
@@ -21,6 +22,20 @@ npm run studio           # Remotion Studio
 | `packages/engine` | Provider catalog + adapters, router, estimator, ledger, executor, presets |
 | `packages/renderer` | Remotion composition that renders a `ShotPlan` |
 | `apps/demo` | End-to-end walkthrough on mock providers |
+| `apps/create` | Figma frame or annotated screenshot + brand kit + brief → quote and render |
+
+## Figma-to-video milestone
+
+The new `design-reveal` preset imports a selected Figma frame with its layer geometry,
+renders the exported PNG with deterministic camera moves and region highlights, and
+uses explicit brand/copy inputs. It never simulates changed product values or clicks.
+The default export is 16:9; the account plan caps resolution. Frame images are
+embedded in the plan so expiring Figma image URLs cannot break later renders.
+
+See [Figma ingestion](docs/figma-ingestion.md) for live access, offline snapshots,
+brand assets, screenshot fallback, and current limitations. The checked-in sample is
+a purpose-built fixture, not a live customer Figma import. Live account access still
+needs an authorized frame link and `FIGMA_ACCESS_TOKEN`.
 
 ## Decisions encoded
 
@@ -32,4 +47,4 @@ npm run studio           # Remotion Studio
 
 ## Not built yet
 
-Browser capture / Figma ingestion, the LLM planner (presets are rule-based today), Cloudflare Workers/Workflows/Queues wiring, Postgres ledger (must match `InMemoryLedger` semantics), billing, auth, web UI, real quality validators, Higgsfield adapter, and syncing the catalog from live provider APIs.
+Browser capture, the LLM planner (presets and focal ranking are rule-based today), Cloudflare Workers/Workflows/Queues wiring, Postgres ledger (must match `InMemoryLedger` semantics), billing, auth, web UI, real quality validators, Higgsfield adapter, and syncing the catalog from live provider APIs. The create command saves local estimates and render status; it does not charge customer usage or replace the production billing lifecycle.
