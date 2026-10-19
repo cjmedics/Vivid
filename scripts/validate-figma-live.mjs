@@ -8,6 +8,8 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 let temporary;
 try {
   if (!process.env.FIGMA_ACCESS_TOKEN?.trim()) throw new Error("Save the FIGMA_ACCESS_TOKEN repository secret before starting live validation.");
+  const token = process.env.FIGMA_ACCESS_TOKEN.trim();
+  if (token !== process.env.FIGMA_ACCESS_TOKEN) console.log("Removed surrounding whitespace from the saved token before use.");
   const frame = new URL(process.env.FIGMA_FRAME_URL ?? "");
   if (frame.protocol !== "https:" || !["figma.com", "www.figma.com"].includes(frame.hostname) || !/^\/(design|file)\/[^/]+/.test(frame.pathname) || !frame.searchParams.get("node-id")) {
     throw new Error("Set FIGMA_FRAME_URL to a Figma frame link with node-id.");
@@ -17,11 +19,13 @@ try {
   writeFileSync(briefPath, JSON.stringify({ productName: "Import validation", description: "Validation of an authorized Figma frame.", category: "Design", headline: "Your design in motion", subtext: "Live import validation", cta: "Explore the design" }));
   const output = resolve(temporary, "production");
   const created = spawnSync(process.execPath, ["--import", "tsx", "apps/create/src/main.ts", "--figma", frame.href, "--brand", "fixtures/design.brand.json", "--brief", briefPath, "--planner", "rules", "--out", output, "--render"], {
-    cwd: root, encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 15 * 60 * 1000, maxBuffer: 1024 * 1024,
+    cwd: root, env: { ...process.env, FIGMA_ACCESS_TOKEN: token }, encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 15 * 60 * 1000, maxBuffer: 1024 * 1024,
   });
   // Never forward renderer output, node names, URLs, tokens, or provider responses to public logs.
   if (created.error || created.status !== 0) {
     const detail = created.stderr ?? "";
+    const diagnostic = detail.match(/Figma diagnostic: HTTP (\d{3}); stage=(nodes|export); reason=(invalid-token|expired-token|scope|file-access|unspecified)\./);
+    if (diagnostic) console.log(`Figma API diagnostic: HTTP ${diagnostic[1]}; stage=${diagnostic[2]}; reason=${diagnostic[3]}.`);
     if (detail.includes("Figma access denied.")) throw new Error("Figma denied access. Check the token, file_content:read scope, and access to the selected file.");
     if (detail.includes("Figma rate limit reached.")) throw new Error("Figma API quota reached. Wait for the provider quota reset before another attempt.");
     throw new Error("Live import or render failed. No raw design data or process logs were published.");

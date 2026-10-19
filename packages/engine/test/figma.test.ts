@@ -75,6 +75,20 @@ describe("Figma design ingestion", () => {
     expect(ir.screens[0]!.captureUrl).toBe(captureDataUrl);
     expect(JSON.stringify(ir)).not.toContain("test-secret");
   });
+  it.each([
+    ["Invalid token private-secret", "invalid-token"],
+    ["Token expired private-secret", "expired-token"],
+    ["Invalid scope(s): private-secret", "scope"],
+    ["Access denied private-secret", "file-access"],
+    ["private-secret", "unspecified"],
+  ])("classifies an API rejection without leaking its body: %s", async (message, reason) => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ err: message }, { status: 403 }));
+    const error = await importFigma({ url, token: "test-secret", brand, brief, fetch: request }).catch((e) => e);
+    expect(error).toMatchObject({ status: 403, stage: "nodes", reason });
+    expect(error.message).not.toContain("private-secret");
+    expect(error.message).not.toContain("test-secret");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
   it.each([403, 429])("reports HTTP %s without retrying blindly or exposing provider response bodies", async (status) => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(new Response("private provider body", { status, headers: { "retry-after": "60" } }));
     await expect(importFigma({ url, token: "test-secret", brand, brief, fetch: request })).rejects.toMatchObject({ status });
