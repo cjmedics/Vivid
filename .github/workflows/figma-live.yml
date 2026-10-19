@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      VIVID_OUTPUT_ROOT: ${{ runner.temp }}/vivid-production
+      VIVID_OUTPUT_ROOT: /tmp/vivid-production
     steps:
       - uses: actions/checkout@v4
         with:
