@@ -1,0 +1,36 @@
+{
+  "product": {
+    "name": "Ledgerly",
+    "url": "https://ledgerly.example",
+    "description": "Revenue analytics for subscription businesses.",
+    "category": "B2B analytics SaaS"
+  },
+  "brand": {
+    "primary": "#5B5BF6",
+    "background": "#0B0D17",
+    "foreground": "#F4F5FA",
+    "accent": "#2DD4BF",
+    "fontFamily": "Inter, system-ui, sans-serif"
+  },
+  "screens": [
+    {
+      "id": "dashboard",
+      "name": "Revenue dashboard",
+      "url": "https://app.ledgerly.example/dashboard",
+      "regions": [
+        { "id": "nav", "kind": "nav", "label": "Ledgerly", "bbox": { "x": 0, "y": 0, "w": 1, "h": 0.08 }, "focalScore": 0.2 },
+        { "id": "sidebar", "kind": "sidebar", "label": "Navigation", "bbox": { "x": 0, "y": 0.08, "w": 0.16, "h": 0.92 }, "focalScore": 0.1 },
+        { "id": "mrr", "kind": "metric", "label": "Monthly recurring revenue", "bbox": { "x": 0.2, "y": 0.13, "w": 0.24, "h": 0.17 }, "focalScore": 0.95, "value": "$48,210", "valueAfter": "$52,940" },
+        { "id": "churn", "kind": "metric", "label": "Net churn", "bbox": { "x": 0.47, "y": 0.13, "w": 0.24, "h": 0.17 }, "focalScore": 0.6, "value": "2.4%" },
+        { "id": "forecast-btn", "kind": "button", "label": "Apply forecast", "bbox": { "x": 0.76, "y": 0.16, "w": 0.18, "h": 0.07 }, "focalScore": 0.8 },
+        { "id": "revenue-chart", "kind": "chart", "label": "Revenue, last 12 months", "bbox": { "x": 0.2, "y": 0.35, "w": 0.74, "h": 0.38 }, "focalScore": 0.85 },
+        { "id": "accounts", "kind": "table", "label": "Top accounts", "bbox": { "x": 0.2, "y": 0.77, "w": 0.74, "h": 0.19 }, "focalScore": 0.3 }
+      ]
+    }
+  ],
+  "copy": {
+    "headline": "See next quarter's revenue today",
+    "subtext": "Forecasts built from your live billing data.",
+    "cta": "Start free at ledgerly.example"
+  }
+}
